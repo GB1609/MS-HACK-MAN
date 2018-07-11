@@ -4,23 +4,46 @@
 #include <string>
 #include <ctime>
 #include <queue>
-
+#include <sstream>
+#include <iterator>
 using namespace std;
-
+int width=-1;
+int height=-1;
+int numNodes=-1;
+////////// let a pair of coordinates returns the corresponding node
+int pairToNode(const int & r,const int & c)
+{
+  return r * width + c;
+}
+class Point;
 class Point {
 public:
 	int x;
 	int y;
+	int node;
 	Point() {}
-	Point(int x, int y): x(x), y(y) {}
+	Point(int x, int y): x(x), y(y), node(pairToNode(y,x)) {}
+	Point(int node) :
+			x(node - ((node / width) * width)), y(node / width), node(node) {
+	}
+
+	Point(const Point& p):x(p.x),y(p.y),node(p.node){};
+	Point(Point&& p):x(std::move(p.x)),y(std::move(p.y)),node(std::move(p.node)){};
 	bool operator<(const Point &a) const {
 		return x < a.x || (x == a.y && y < a.y);
 	}
 	bool operator==(const Point &a) const {
 		return x == a.x && y == a.y;
 	}
-};
 
+};
+///////// let a node returns its coordinates
+Point nodeToPair(const int & node)
+{
+  int r = node / width;
+	int c = node - (r * width);
+  return std::move(Point(c,r));
+}
 class Player : public Point {
 public:
 	string name;
@@ -28,10 +51,40 @@ public:
 	int snippets;
 	int bombs;
 };
+class SimpleObject: public Point {
+public:
+	SimpleObject(int x, int y) :
+			Point(x, y) {
+	}
 
-int width;
-int height;
-vector<vector<bool> > is_wall;
+	SimpleObject(int node) :
+			Point(node) {
+	}
+};
+class ObjectWithRounds: public Point {
+public:
+	int rounds;
+	ObjectWithRounds(int x, int y, int rounds) :
+			Point(x, y), rounds(rounds) {
+	}
+	ObjectWithRounds(int node, int rounds) :
+			Point(node), rounds(rounds) {
+	}
+	ObjectWithRounds(int node) :
+			Point(node), rounds(-1) {
+	}
+};
+//class Cell: public Point{
+template <char delimiter>
+class StringDelimitedBy: public string{
+
+	friend std::istream& operator>>(std::istream& is, StringDelimitedBy& output)
+	{
+	   std::getline(is, output, delimiter);
+	   return is;
+	}
+};
+//vector<vector<bool> > is_wall;
 int timebank;
 int time_per_move;
 int time_remaining;
@@ -39,16 +92,136 @@ int max_rounds;
 int current_round;
 Player me;
 Player enemy;
-vector< Point > snippets;
-vector< pair<Point, int> > weapons;
-vector< pair<Point, int> > bugs;
-vector< pair<Point, int> > spawn_points;
-vector< pair<Point, int> > gates;
-vector< vector<string> > cells;
+vector<SimpleObject> snippets;
+vector<ObjectWithRounds> weapons;
+vector<ObjectWithRounds> bugs;
+vector<ObjectWithRounds> spawn_points;
+vector<ObjectWithRounds> gates;
+//vector<ObjectWithRounds> cells;
 
 void choose_character();
 void do_move();
 
+bool** matrixAdiacents;
+bool isSetWalls=false;
+int dx[4] = { 0, -1, 0, 1 };
+int dy[4] = { -1, 0, 1, 0 };
+string moves[4] = { "up", "left", "down", "right" };
+void initAdiacents(){
+	for(int r=0;r<height;r++){
+		for(int c=0;c<width;c++){
+			int currentNode=pairToNode(r,c);
+			int adiacentNode;
+			for(int i=0;i<4;i++){
+				int adiacentR=r+dy[i];
+				int adiacentC=c+dx[i];
+				if(adiacentR<height&&adiacentR>=0&&adiacentC<width&&adiacentC>=0)
+				{
+					adiacentNode=pairToNode(adiacentR,adiacentC);
+					matrixAdiacents[currentNode][adiacentNode]=1;
+					matrixAdiacents[adiacentNode][currentNode]=1;
+				}
+			}
+		}
+	}
+}
+void removeAdiacents(int cell){
+	Point cellCoordinate(cell);
+	for(int i=0;i<4;i++){
+		int adiacentR=cellCoordinate.y+dy[i];
+		int adiacentC=cellCoordinate.x+dx[i];
+
+		if(adiacentR<height&&adiacentR>=0&&adiacentC<width&&adiacentC>=0)
+		{
+			int adiacentNode=pairToNode(adiacentR,adiacentC);
+			matrixAdiacents[cell][adiacentNode] = 0;
+			matrixAdiacents[adiacentNode][cell] = 0;
+		}
+	}
+}
+void parseSingleCharacter(const char& c, const int & cell) {
+	switch (c) {
+		case 'S':
+		spawn_points.push_back(ObjectWithRounds(cell));
+		break;
+		case 'C':
+		snippets.push_back(SimpleObject(cell));
+		break;
+		case 'B':
+		weapons.push_back(ObjectWithRounds(cell));
+		break;
+		default:
+		break;
+	}
+}
+void parseObjects(const string & objList, const int &cell) {
+	Point currentCoordinates(nodeToPair(cell));
+	if (objList.size() == 1)
+		parseSingleCharacter(objList[0], cell);
+	else {
+		std::istringstream issl(objList);
+		std::vector<string> objs(
+				(std::istream_iterator<StringDelimitedBy<';'>>(issl)),
+				std::istream_iterator<StringDelimitedBy<';'>>());
+		for (unsigned int i = 0; i < objs.size(); i++) {
+			if (objs[i].size() == 1)
+				parseSingleCharacter(objs[i][0], cell);
+			else {
+				switch (objs[i][0]) {
+				case 'P': {
+					int id = objs[i][1] - '0';
+					if (id == me.id) {
+						me.x = currentCoordinates.x;
+						me.y = currentCoordinates.y;
+					} else {
+						enemy.x = currentCoordinates.x;
+						enemy.y = currentCoordinates.y;
+					}
+				}
+					break;
+				case 'S': {
+					spawn_points.push_back(
+							ObjectWithRounds(cell, stoi(objs[i].erase(0, 1))));
+				}
+					break;
+				case 'G':
+					int d;
+					switch (objs[i][1]) {
+					case 'u':
+						d = 0;
+						break;
+					case 'd':
+						d = 1;
+						break;
+					case 'l':
+						d = 2;
+						break;
+					case 'r':
+						d = 3;
+						break;
+					}
+					gates.push_back(ObjectWithRounds(cell, d));
+					break;
+				case 'E':
+					bugs.push_back(ObjectWithRounds(cell, objs[i][1] - '0'));
+					break;
+				case 'B':
+					weapons.push_back(
+							ObjectWithRounds(cell, stoi(objs[i].erase(0, 1))));
+					break;
+				default:
+					break;
+				}
+			}
+		}
+	}
+}
+void addAdiacentsGates() {
+	for (unsigned int i = 0; i < gates.size(); i++)
+		for (unsigned int j = 0; j < gates.size(); j++)
+			matrixAdiacents[gates[i].node][gates[j].node] = 1;
+
+}
 void process_next_command() {
 	string command;
 	cin >> command;
@@ -74,6 +247,18 @@ void process_next_command() {
 		} else if (type == "max_rounds") {
 			cin >> max_rounds;
 		}
+		if(width!=-1 && height!=-1){
+			//int tmp=width;
+			//width=height;
+			//height=tmp;
+			numNodes = width * height;
+			matrixAdiacents = new bool*[numNodes];
+			for(int r =0;r < numNodes;r++){
+				matrixAdiacents[r]=new bool[numNodes]{0};
+			}
+			initAdiacents();
+		}
+
 	} else if (command == "update") {
 		string player_name, type;
 		cin >> player_name >> type;
@@ -85,93 +270,23 @@ void process_next_command() {
 			bugs.clear();
 			gates.clear();
 			spawn_points.clear();
-			is_wall.clear();
-			for (int x = 0; x < height; x++) {
-				is_wall.push_back(vector<bool>(width));
-			}
 			string s;
-			cin >> s;
-			cells.clear();
-			while (true) {
-				size_t found = s.find(",");
-				string t;
-				if (found == string::npos) {
-					t = s;
-				} else {
-					t = s.substr(0, found);
-					s.erase(0, found + 1);
-				}
+			cin>>s;
 
-				vector<string> a; a.clear();
-				while (true) {
-					size_t found = t.find(";");
-					if (found == string::npos) {
-						a.push_back(t);
-						break;
-					}
-					a.push_back(t.substr(0, found));
-					t.erase(0, found + 1);
-				}
-				cells.push_back(a);
+			std::istringstream iss(s);
+			std::vector<std::string> fields((std::istream_iterator<StringDelimitedBy<','>>(iss)),
+		                                 std::istream_iterator<StringDelimitedBy<','>>());
 
-				if (found == string::npos) {
-					break;
-				}
+			for(unsigned int ce=0;ce<fields.size();ce++){
+				if(fields[ce][0]=='x'&&!isSetWalls)
+					removeAdiacents(ce);
+				else if (fields[ce][0]=='x')
+						continue;
+				parseObjects(fields[ce],ce);
 			}
-
-			for (int x = 0; x < height; x++) {
-				for (int y = 0; y < width; y++) {
-					Point pt;
-					pt.x = x;
-					pt.y = y;
-					int l = x * width + y;
-					int size = cells[l].size();
-					for (int i = 0; i < size; i++) {
-						string c = cells[l][i];
-						if (c[0] == 'x') {
-							is_wall[x][y] = true;
-						} else if (c[0] == '.') {
-							//do nothing, is_wall[x][y] == 0 by default
-						} else if (c[0] == 'P') {
-							// player id
-							int id = c[1] - '0';
-							if (id == me.id) {
-								me.x = x;
-								me.y = y;
-							}
-							else {
-								enemy.x = x;
-								enemy.y = y;
-							}
-						} else if (c[0] == 'S') {
-							if (c != "S") {
-								spawn_points.push_back(make_pair(pt, stoi(c.erase(0, 1))));
-							} else {
-								spawn_points.push_back(make_pair(pt, -1));
-							}
-						} else if (c[0] == 'G') {
-							int d;
-							switch (c[1]) {
-							case 'u': d = 0; break;
-							case 'd': d = 1; break;
-							case 'l': d = 2; break;
-							case 'r': d = 3; break;
-							};
-							gates.push_back(make_pair(pt, d));
-						} else if (c[0] == 'E') {
-							bugs.push_back(make_pair(pt, c[1] - '0'));
-						} else if (c[0] == 'B') {
-							if (c != "B") {
-								weapons.push_back(make_pair(pt, stoi(c.erase(0, 1))));
-							} else {
-								weapons.push_back(make_pair(pt, -1));
-							}
-						} else if (c[0] == 'C') {
-							snippets.push_back(pt);
-						}
-					}
-				}
-			}
+			if (!isSetWalls) //todo delete if the gates modify their direction
+				addAdiacentsGates();
+			isSetWalls = true;
 		} else if (type == "snippets") {
 			if (player_name == me.name) {
 				cin >> me.snippets;
@@ -202,6 +317,12 @@ int main() {
 	while (true) {
 		process_next_command();
 	}
+	for (int i = 0; i < numNodes; i++) {
+		delete[] matrixAdiacents[i];
+	}
+	for (int i = 0; i < numNodes; i++) {
+		delete matrixAdiacents[i];
+	}
 	return 0;
 }
 
@@ -209,13 +330,10 @@ int main() {
 //  Improve the code below to win 'em all  //
 //-----------------------------------------//
 
-int dx[4] = { -1,0,1,0 };
-int dy[4] = { 0,-1,0,1 };
-string moves[4] = { "up", "left", "down", "right" };
+
 
 void choose_character() {
-	cout << "bixie" << endl;
-	// cout << "bixiette" << endl;
+	 cout << "bixiette" << endl;
 }
 
 void do_move() {
@@ -225,8 +343,9 @@ void do_move() {
 	for (int dir = 0; dir < 4; dir++) {
 		int nextx = me.x + dx[dir];
 		int nexty = me.y + dy[dir];
-		if (nextx >= 0 && nextx < height && nexty >= 0 && nexty < width) {
-			if (!is_wall[nextx][nexty]) {
+		if (nextx >= 0 && nextx < width && nexty >= 0 && nexty < height) {
+			if (matrixAdiacents[pairToNode(me.y, me.x)][pairToNode(nexty, nextx)]
+					== 1) {
 				valid_moves.push_back(moves[dir]);
 			}
 		}

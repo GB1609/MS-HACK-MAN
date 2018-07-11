@@ -566,13 +566,51 @@ int getObjectiveGreenBugsTR(const int & posBegin)
 }
 int getObjectiveYellowBugsBR(const int& posBegin)
 {
-//	int closestPlayer=getClosestPlayer(nrPlayer,posBegin);
-//	int closestBugToClPL=getClosestBug(nrBugs,closestPlayer);
-//	int xVett=abs(players[closestPlayer].x-bugs[closestBugToClPL].x);
-//	int yVett=abs(players[closestPlayer].y-bugs[closestBugToClPL].y);
-//	return pairToNode(yVett*2,xVett*2);
-	return 3;
+	int playerX = 0;
+	int playerY = 0;
+
+	int closestPlayer = getClosestPlayer(posBegin);
+	int closestPlayerNode = darkMind.node;
+
+	playerX = darkMind.x;
+	playerY = darkMind.y;
+
+	if(closestPlayer != darkMind.id)
+	{
+		closestPlayerNode = enemy.node;
+		playerX = enemy.x;
+		playerY = enemy.y;
+	}
+
+
+	int closestBug=getClosestBug(closestPlayerNode);
+	
+	int bugX = bugs[closestBug].x;
+	int bugY = bugs[closestBug].y;
+
+	int x = -bugX + playerX;
+	int y = -bugY + playerY;
+
+	x = playerX + x;
+	y = playerY + y;
+
+	if(y > height -1)
+		y = height - 1;
+	
+	if(y < 0)
+		y = 0;
+	
+	if(x > width -1)
+		x = width - 1;
+	
+	if(x < 0)
+		x = 0;
+
+	return pairToNode(y,x);
+
 }
+
+
 int getObjectiveBlueBugsBL(const int& posBegin)
 {
 	int fartherPlayer = getFartherPlayer(posBegin);

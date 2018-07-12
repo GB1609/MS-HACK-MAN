@@ -12,6 +12,7 @@ int width = -1;
 int height = -1;
 int numNodes = -1;
 static int turn = 0;
+static string precPath = "";
 ////////// let a pair of coordinates returns the corresponding node
 int pairToNode(const int & r, const int & c)
 {
@@ -664,13 +665,24 @@ void do_move()
 			pathToPrint = i;
 		}
 	}
-	if (pathToPrint == -1 || myPath[pathToPrint] == "" || myPath[pathToPrint] == "error")
+	if (precPath != "" && precPath.length() < min)
+	{
+		cout << getPathMove(precPath) << endl;
+		precPath = precPath.substr(1, myPath[pathToPrint].length());
+	}
+	else if (pathToPrint == -1 || myPath[pathToPrint] == "" || myPath[pathToPrint] == "error")
 	{
 		cout << "pass" << endl;
+		precPath="";
 	}
-	else cout << getPathMove(myPath[pathToPrint]) << endl;
+	else
+	{
+		cout << getPathMove(myPath[pathToPrint]) << endl;
+		precPath = myPath[pathToPrint].substr(1, myPath[pathToPrint].length());
+	}
 	cerr << "END TURN: " << turn << endl;
 	turn++;
+
 }
 
 float euclidianDistanceNode(const int & node1, const int & node2)
@@ -847,7 +859,7 @@ string pathFind(bool** &adiacents, const int & posBegin, const int & posEnd)
 	int yStart = nodeToPair(posBegin).x;
 	int yFinish = nodeToPair(posEnd).x;
 
-	if (xStart < 0 || yStart <0 || xFinish<0 ||yFinish<0 || xStart >= height || yStart >= width)
+	if (xStart < 0 || yStart < 0 || xFinish < 0 || yFinish < 0 || xStart >= height || yStart >= width)
 	{
 		return "pass";
 	}
@@ -873,9 +885,8 @@ string pathFind(bool** &adiacents, const int & posBegin, const int & posEnd)
 		}
 	}
 	n0 = new Point(xStart, yStart, 0, 0);
-//	int nodeS = pairToNode(xStart, yStart);
-//	int est = estimatedCost(adiacents, nodeS, nodeS, direction);
-	int est=0;
+	int nodeS = pairToNode(xStart, yStart);
+	int est = euclidianDistanceNode(nodeS, posEnd);
 	n0->updatePriority(est);
 	pq[pqi].push(*n0);
 	open_nodes_map[x][y] = n0->getPriority(); // mark it on the open nodes map
@@ -921,7 +932,7 @@ string pathFind(bool** &adiacents, const int & posBegin, const int & posEnd)
 				m0 = new Point(xdx, ydy, n0->getLevel(), n0->getPriority());
 				m0->nextLevel(i);
 //				int cost = estimatedCost(adiacents, nodeStart, nodeNext, direction);
-				int cost=0;
+				int cost = euclidianDistanceNode(nodeStart, nodeNext);
 				m0->updatePriority(cost);
 
 				if (open_nodes_map[xdx][ydy] == 0)

@@ -26,29 +26,54 @@ int getObjectiveRedBugsTL(const int & posBegin);
 int getObjectiveGreenBugsTR(const int & posBegin);
 int getObjectiveYellowBugsBR(const int& posBegin);
 int getObjectiveBlueBugsBL(const int& posBegin);
+string getPathMove(string path);
+string pathFind(bool** & adiacents, const int & posBegin, const int & posEnd);
 
+class Point;
 class Point {
 public:
 	int x;
 	int y;
 	int node;
+	int level; //ELENA SERVONO PER IL PATH, a priority andra il costo
+	int priority;
 	Point() // @suppress("Class members should be properly initialized")
 	{
 	}
 	Point(int x, int y) :
 			x(x), y(y), node(pairToNode(y, x)) {
+		priority = 0;
+		level = 0;
+	}
+	Point(int x, int y, int l, int p) :
+			x(x), y(y), node(pairToNode(y, x)) {
+		priority = 0;
+		level = 0;
 	}
 	Point(int node) :
 			x(node - ((node / width) * width)), y(node / width), node(node) {
+		priority = 0;
+		level = 0;
 	}
-	Point(const Point & p) :
+
+	Point(const Point& p) :
 			x(p.x), y(p.y), node(p.node) {
+		priority = 0;
+		level = 0;
 	}
-	Point(const Point && p) :
-			x(p.x), y(p.y), node(p.node) {
-	}
+	;
 	Point(Point&& p) :
 			x(std::move(p.x)), y(std::move(p.y)), node(std::move(p.node)) {
+		priority = 0;
+		level = 0;
+	}
+	;
+	void updatePriority(/*const int & xDest, const int & yDest*/int heuristic) {
+		priority = level + heuristic; //A*
+	}
+	void nextLevel(const int & i) // i: direction
+			{
+		level += (4 == 4 ? (i % 2 == 0 ? 10 : 14) : 10);
 	}
 	bool operator<(const Point &a) const {
 		return x < a.x || (x == a.y && y < a.y);
@@ -57,10 +82,32 @@ public:
 		return x == a.x && y == a.y;
 	}
 	Point& operator=(const Point &a) {
-		this->x = a.x;
-		this->y = a.y;
-		this->node = a.node;
+		x = a.x;
+		y = a.y;
+		priority = a.priority;
+		level = a.level;
+		node = a.node;
 		return *this;
+	}
+
+	int getLevel() const {
+		return level;
+	}
+
+	int getNode() const {
+		return node;
+	}
+
+	int getPriority() const {
+		return priority;
+	}
+
+	int getX() const {
+		return x;
+	}
+
+	int getY() const {
+		return y;
 	}
 };
 ///////// let a node returns its coordinates
@@ -82,10 +129,8 @@ public:
 		node = pairToNode(r, c);
 	}
 	void setPosition(int node) {
-		Point p(nodeToPair(node));
-		x = p.x;
-		y = p.y;
-		node = p.node;
+		Point tmp(nodeToPair(node));
+		setPosition(tmp);
 	}
 	void setPosition(Point & p) {
 		x = p.x;
@@ -173,7 +218,6 @@ vector<ObjectWithRounds> weapons;
 vector<Bug> bugs;
 vector<ObjectWithRounds> spawn_points;
 vector<ObjectWithRounds> gates;
-//vector<ObjectWithRounds> cells;
 
 void choose_character();
 void do_move();
@@ -183,11 +227,9 @@ Cell** matrixWeight;
 bool isSetWalls = false;
 int dx[4] = { 0, -1, 0, 1 };
 int dy[4] = { -1, 0, 1, 0 };
-string moves[4] = { "up", "left", "down", "right" };
 void initAdiacents() {
 	for (int r = 0; r < height; r++) {
 		for (int c = 0; c < width; c++) {
-
 			int currentNode = pairToNode(r, c);
 			int adiacentNode;
 			for (int i = 0; i < 4; i++) {
@@ -296,7 +338,6 @@ void addAdiacentsGates() {
 
 }
 void weighs_cells() {
-	cerr << "quiquiquiquiquiquiquiqiuqiu" << endl;
 	for (int r = 0; r < height; r++) {
 		for (int c = 0; c < width; c++) {
 
@@ -308,7 +349,7 @@ void weighs_cells() {
 					float rPeso = 1 - ((bugRow - (1 + r)) / 10);
 
 					if (c <= bugCol) {
-					float cPeso = rPeso - bugCol - c;
+						float cPeso = rPeso - bugCol - c;
 						matrixWeight[r][c].weight += cPeso > 0 ? cPeso : 0;
 					} else {
 						float cPeso = rPeso + ((bugCol - c) / 10);
@@ -322,14 +363,13 @@ void weighs_cells() {
 						matrixWeight[r][c].weight += p > 0 ? p : 0;
 					} else {
 						if (c == bugCol) {
-						matrixWeight[r][c].weight = 1.5;
-					}
-					else {
+							matrixWeight[r][c].weight = 1.5;
+						} else {
 							float p = 1 - ((c - bugCol - 1) / 10);
 							matrixWeight[r][c].weight += p > 0 ? p : 0;
 						}
 					}
-			}
+				}
 				if (r > bugRow) {
 					float rPeso = 1 - ((bugRow - r + 1) / 10);
 					if (c <= bugCol) {
@@ -344,12 +384,12 @@ void weighs_cells() {
 			}
 		}
 	}
-	for (int r = 0; r < height; r++)
-		{
-		for (int c = 0; c < width; c++)
-			cerr << matrixWeight[r][c].weight << "-";
-		cerr << endl;
-	}
+//	for (int r = 0; r < height; r++)
+//	{
+//		for (int c = 0; c < width; c++)
+//			cerr << matrixWeight[r][c].weight << "-";
+//		cerr << endl;
+//	}
 }
 void process_next_command() {
 	string command;
@@ -386,8 +426,8 @@ void process_next_command() {
 				matrixAdiacents[r] = new bool[numNodes] { 0 };
 			}
 			matrixWeight = new Cell*[height];
-				for (int i = 0; i < height; i++)
-					matrixWeight[i] = new Cell[width];
+			for (int i = 0; i < height; i++)
+				matrixWeight[i] = new Cell[width];
 			initAdiacents();
 		}
 
@@ -454,39 +494,37 @@ int main() {
 	for (int i = 0; i < numNodes; i++) {
 		delete[] matrixAdiacents[i];
 	}
-		delete[] matrixAdiacents;
-		for (int i = 0; i < height; i++) {
-			delete[] matrixWeight[i];
-		}
-		delete[] matrixWeight;
+	delete[] matrixAdiacents;
+	for (int i = 0; i < height; i++) {
+		delete[] matrixWeight[i];
+	}
+	delete[] matrixWeight;
 	return 0;
 }
-
-//-----------------------------------------//
-//  Improve the code below to win 'em all  //
-//-----------------------------------------//
-
 void choose_character() {
 	cout << "bixiette" << endl;
 }
 
 void do_move() {
-	srand(time(NULL));
-	vector<string> valid_moves;
-	valid_moves.clear();
-	for (int dir = 0; dir < 4; dir++) {
-		int nextx = darkMind.x + dx[dir];
-		int nexty = darkMind.y + dy[dir];
-		if (nextx >= 0 && nextx < width && nexty >= 0 && nexty < height) {
-			if (matrixAdiacents[pairToNode(darkMind.y, darkMind.x)][pairToNode(nexty, nextx)] == 1) {
-				valid_moves.push_back(moves[dir]);
-			}
+	string path = "";
+	vector<string> paths(snippets.size()); //mi serve a me gb
+	unsigned int min = width * height;
+	int pathToPrint = -1;
+	for (unsigned int i = 0; i < snippets.size(); i++) {
+//		cerr << "snippet pos:" << snippets[i].node << endl;
+//		cerr << "dm pos:" << darkMind.node << endl;
+		path = pathFind(matrixAdiacents, darkMind.node, snippets[i].node);
+		paths[i] = path;
+		if (path.length() < min && path.length() > 0) {
+			min = path.length();
+			pathToPrint = i;
 		}
 	}
-	if (valid_moves.size() == 0) {
-		valid_moves.push_back("pass");
-	}
-	cout << valid_moves[rand() % valid_moves.size()] << endl;
+//	cerr << "PATH: " << paths[pathToPrint] << "to snippets:" << snippets[pathToPrint].node << "("
+//			<< snippets[pathToPrint].y << "," << snippets[pathToPrint].x << ")" << endl;
+	if (paths[pathToPrint] == "" || paths[pathToPrint] == "error") {
+		cout << "pass" << endl;
+	} else cout << getPathMove(paths[pathToPrint]) << endl;
 }
 
 float euclidianDistanceNode(const int & node1, const int & node2) {
@@ -568,12 +606,41 @@ int getObjectiveGreenBugsTR(const int & posBegin) {
 	return 0;
 }
 int getObjectiveYellowBugsBR(const int& posBegin) {
-//	int closestPlayer=getClosestPlayer(nrPlayer,posBegin);
-//	int closestBugToClPL=getClosestBug(nrBugs,closestPlayer);
-//	int xVett=abs(players[closestPlayer].x-bugs[closestBugToClPL].x);
-//	int yVett=abs(players[closestPlayer].y-bugs[closestBugToClPL].y);
-//	return pairToNode(yVett*2,xVett*2);
-	return 3;
+	int playerX = 0;
+	int playerY = 0;
+
+	int closestPlayer = getClosestPlayer(posBegin);
+	int closestPlayerNode = darkMind.node;
+
+	playerX = darkMind.x;
+	playerY = darkMind.y;
+
+	if (closestPlayer != darkMind.id) {
+		closestPlayerNode = enemy.node;
+		playerX = enemy.x;
+		playerY = enemy.y;
+	}
+
+	int closestBug = getClosestBug(closestPlayerNode);
+
+	int bugX = bugs[closestBug].x;
+	int bugY = bugs[closestBug].y;
+
+	int x = -bugX + playerX;
+	int y = -bugY + playerY;
+
+	x = playerX + x;
+	y = playerY + y;
+
+	if (y > height - 1) y = height - 1;
+
+	if (y < 0) y = 0;
+
+	if (x > width - 1) x = width - 1;
+
+	if (x < 0) x = 0;
+
+	return pairToNode(y, x);
 }
 int getObjectiveBlueBugsBL(const int& posBegin) {
 	int fartherPlayer = getFartherPlayer(posBegin);
@@ -581,4 +648,111 @@ int getObjectiveBlueBugsBL(const int& posBegin) {
 	else return enemy.node;
 	return 4;
 }
+string getPathMove(string path) {
+	char toVerify = path[0];
+	if (toVerify == '0') return "down";
+	else if (toVerify == '1') return "right";
+	else if (toVerify == '2') return "up";
+	else if (toVerify == '3') return "left";
+	return "error";
+}
+string pathFind(bool** & adiacents, const int & posBegin, const int & posEnd) {
+	int xStart = nodeToPair(posBegin).y;
+	int yStart = nodeToPair(posBegin).x;
+	int xFinish = nodeToPair(posEnd).y;
+	int yFinish = nodeToPair(posEnd).x;
+	int dx[4] = { 1, 0, -1, 0 };
+	int dy[4] = { 0, 1, 0, -1 };
+	if (xStart < 0 || yStart < 0 || xStart >= width || yStart >= height || xFinish < 0 || yFinish < 0 || xFinish >= width || yFinish >= height) {
+		return "";
+	}
+	static priority_queue<Point> pq[2]; // list of open (not-yet-tried) nodes
+	static int pqi; // pq index
+	static Point* n0;
+	static Point* m0;
+	static int i, j, x, y, xdx, ydy;
+	int dir_map[numNodes][numNodes]; // map of directions
+	static char c;
+	int possibleDirection = 4;
+	pqi = 0;
+	int closed_nodes_map[numNodes][numNodes];
+	int open_nodes_map[numNodes][numNodes];
+	for (y = 0; y < numNodes; y++) {
+		for (x = 0; x < numNodes; x++) {
+			closed_nodes_map[x][y] = 0;
+			open_nodes_map[x][y] = 0;
+		}
+	}
+	n0 = new Point(xStart, yStart, 0, 0);
+//	int nodeS = pairToNode(xStart, yStart);
+//	int est = estimatedCost(adiacents, nodeS, nodeS, direction);
+	int est = 1;
+	n0->updatePriority(est);
+	pq[pqi].push(*n0);
+	open_nodes_map[x][y] = n0->getPriority(); // mark it on the open nodes map
+	while (!pq[pqi].empty()) {
+		n0 = new Point(pq[pqi].top().getX(), pq[pqi].top().getY(), pq[pqi].top().getLevel(), pq[pqi].top().getPriority());
+		x = n0->getX();
+		y = n0->getY();
+		pq[pqi].pop(); // remove the node from the open list
+		open_nodes_map[x][y] = 0;
+		// mark it on the closed nodes map
+		closed_nodes_map[x][y] = 1;
+		int nodeStart = pairToNode(x, y);
+		if (x == xFinish && y == yFinish) {
+			string path = "";
+			while (!(x == xStart && y == yStart)) {
+				j = dir_map[x][y];
+				c = '0' + (j + possibleDirection / 2) % possibleDirection;
+				path = c + path;
+				x += dx[j];
+				y += dy[j];
+			}
 
+			delete n0;
+			while (!pq[pqi].empty())
+				pq[pqi].pop();
+			return path;
+		}
+
+		for (i = 0; i < 4; i++) {
+			xdx = x + dx[i];
+			ydy = y + dy[i];
+			int nodeNext = pairToNode(xdx, ydy);
+			if (!(xdx < 0 || xdx > numNodes - 1 || ydy < 0 || ydy > numNodes - 1 || closed_nodes_map[xdx][ydy] == 1) && (nodeStart >= 0 && nodeStart < numNodes)
+					&& (nodeNext >= 0 && nodeNext < numNodes) && adiacents[nodeStart][nodeNext]) {
+				// generate a child node
+				m0 = new Point(xdx, ydy, n0->getLevel(), n0->getPriority());
+				m0->nextLevel(i);
+//				int cost = estimatedCost(adiacents, nodeStart, nodeNext, direction);
+				int cost = 0;
+				m0->updatePriority(cost);
+
+				if (open_nodes_map[xdx][ydy] == 0) {
+					open_nodes_map[xdx][ydy] = m0->getPriority();
+					pq[pqi].push(*m0);
+					dir_map[xdx][ydy] = (i + possibleDirection / 2) % possibleDirection;
+				} else if (open_nodes_map[xdx][ydy] > m0->getPriority()) {
+					open_nodes_map[xdx][ydy] = m0->getPriority();
+					dir_map[xdx][ydy] = (i + possibleDirection / 2) % 4;
+					while (!(pq[pqi].top().getX() == xdx && pq[pqi].top().getY() == ydy)) {
+						pq[1 - pqi].push(pq[pqi].top());
+						pq[pqi].pop();
+					}
+					pq[pqi].pop(); // remove the wanted node
+
+					// empty the larger size pq to the smaller one
+					if (pq[pqi].size() > pq[1 - pqi].size()) pqi = 1 - pqi;
+					while (!pq[pqi].empty()) {
+						pq[1 - pqi].push(pq[pqi].top());
+						pq[pqi].pop();
+					}
+					pqi = 1 - pqi;
+					pq[pqi].push(*m0); // add the better node instead
+				} else delete m0; // garbage collection
+			}
+		}
+		delete n0; // garbage collection
+	}
+	return ""; // no route found
+}

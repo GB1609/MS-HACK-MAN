@@ -191,11 +191,11 @@ public:
 			Point(node), weight(weight) {
 	}
 	Cell(int node) :
-			Point(node), weight(0) {
+			Point(node), weight(0.0) {
 
 	}
 	Cell() :
-			Point(), weight(0) {
+			Point(), weight(0.0) {
 	}
 };
 //class Cell: public Point{
@@ -245,6 +245,7 @@ void initAdiacents() {
 			cell.x = c;
 			cell.y = r;
 			cell.node = currentNode;
+			cell.weight = 0.0f;
 		}
 	}
 }
@@ -341,55 +342,59 @@ void weighs_cells() {
 	for (int r = 0; r < height; r++) {
 		for (int c = 0; c < width; c++) {
 
-			matrixWeight[r][c].weight = 0;
+			matrixWeight[r][c].weight = 0.0f;
 			for (unsigned int bug = 0; bug < bugs.size(); bug++) {
 				int bugCol = bugs[bug].x;
 				int bugRow = bugs[bug].y;
 				if (r < bugRow) {
-					float rPeso = 1 - ((bugRow - (1 + r)) / 10);
+					float rPeso = 1.0 - ((bugRow - (1.0 + r)) / 10.0);
 
 					if (c <= bugCol) {
 						float cPeso = rPeso - bugCol - c;
-						matrixWeight[r][c].weight += cPeso > 0 ? cPeso : 0;
+						matrixWeight[r][c].weight += cPeso > 0.0 ? cPeso : 0.0;
 					} else {
 						float cPeso = rPeso + ((bugCol - c) / 10);
-						matrixWeight[r][c].weight += cPeso < 1 ? cPeso : 1;
+						matrixWeight[r][c].weight += cPeso < 1.0 ? cPeso : 1.0;
 
 					}
 				}
 				if (r == bugRow) {
 					if (c < bugCol) {
-						float p = 1 - ((bugCol - c - 1) / 10);
-						matrixWeight[r][c].weight += p > 0 ? p : 0;
+						float p = 1.0 - ((bugCol - c - 1.0) / 10.0);
+						matrixWeight[r][c].weight += p > 0.0 ? p : 0.0;
 					} else {
 						if (c == bugCol) {
 							matrixWeight[r][c].weight = 1.5;
 						} else {
-							float p = 1 - ((c - bugCol - 1) / 10);
-							matrixWeight[r][c].weight += p > 0 ? p : 0;
+							float p = 1.0 - ((c - bugCol - 1.0) / 10.0);
+							matrixWeight[r][c].weight += p > 0.0 ? p : 0.0;
 						}
 					}
 				}
 				if (r > bugRow) {
-					float rPeso = 1 - ((bugRow - r + 1) / 10);
+					float rPeso = 1.0 - ((bugRow - r + 1.0) / 10.0);
 					if (c <= bugCol) {
-						float cPeso = 1 - ((bugCol - c) / 10);
-						matrixWeight[r][c].weight += cPeso > 0 ? cPeso : 0;
+						float cPeso = 1.0 - ((bugCol - c) / 10.0);
+						matrixWeight[r][c].weight += cPeso > 0.0 ? cPeso : 0.0;
 					} else {
-						float cPeso = rPeso - ((c - bugCol) / 10);
-						matrixWeight[r][c].weight += cPeso > 0 ? cPeso : 0;
+						float cPeso = rPeso - ((c - bugCol) / 10.0);
+						matrixWeight[r][c].weight += cPeso > 0.0 ? cPeso : 0.0;
 					}
 
 				}
 			}
 		}
 	}
-//	for (int r = 0; r < height; r++)
-//	{
-//		for (int c = 0; c < width; c++)
-//			cerr << matrixWeight[r][c].weight << "-";
-//		cerr << endl;
-//	}
+	if (bugs.size() != 0) {
+		for (unsigned int i = 0; i < bugs.size(); i++)
+			cerr << bugs[i].y << "---" << bugs[i].x << endl;
+		cerr << "llllllllllllllllllllllllllllll" << endl;
+		for (int r = 0; r < height; r++) {
+			for (int c = 0; c < width; c++)
+				cerr << matrixWeight[r][c].weight << "-";
+			cerr << endl;
+		}
+	}
 }
 void process_next_command() {
 	string command;

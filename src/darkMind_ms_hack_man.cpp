@@ -82,8 +82,10 @@ public:
 		node = pairToNode(r, c);
 	}
 	void setPosition(int node) {
-		Point tmp(nodeToPair(node));
-		setPosition(tmp);
+		Point p(nodeToPair(node));
+		x = p.x;
+		y = p.y;
+		node = p.node;
 	}
 	void setPosition(Point & p) {
 		x = p.x;
@@ -200,7 +202,7 @@ void initAdiacents() {
 			Cell & cell = matrixWeight[r][c];
 			cell.x = c;
 			cell.y = r;
-			c = currentNode;
+			cell.node = currentNode;
 		}
 	}
 }

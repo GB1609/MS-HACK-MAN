@@ -11,6 +11,7 @@ using namespace std;
 int width = -1;
 int height = -1;
 int numNodes = -1;
+
 ////////// let a pair of coordinates returns the corresponding node
 int pairToNode(const int & r, const int & c) {
 	return r * width + c;
@@ -40,22 +41,27 @@ public:
 	Point(int node) :
 			x(node - ((node / width) * width)), y(node / width), node(node) {
 	}
-
-	Point(const Point& p) :
+	Point(const Point & p) :
 			x(p.x), y(p.y), node(p.node) {
 	}
-
+	Point(const Point && p) :
+			x(p.x), y(p.y), node(p.node) {
+	}
 	Point(Point&& p) :
 			x(std::move(p.x)), y(std::move(p.y)), node(std::move(p.node)) {
 	}
-
 	bool operator<(const Point &a) const {
 		return x < a.x || (x == a.y && y < a.y);
 	}
 	bool operator==(const Point &a) const {
 		return x == a.x && y == a.y;
 	}
-
+	Point& operator=(const Point &a) {
+		this->x = a.x;
+		this->y = a.y;
+		this->node = a.node;
+		return *this;
+	}
 };
 ///////// let a node returns its coordinates
 Point nodeToPair(const int & node) {
@@ -70,7 +76,23 @@ public:
 	int id;
 	int snippets;
 	int bombs;
+	void setPosition(int r, int c) {
+		x = c;
+		y = r;
+		node = pairToNode(r, c);
+	}
+	void setPosition(int node) {
+		Point tmp(nodeToPair(node));
+		setPosition(tmp);
+	}
+	void setPosition(Point & p) {
+		x = p.x;
+		y = p.y;
+		node = p.node;
+	}
 };
+Player darkMind;
+Player enemy;
 class SimpleObject: public Point {
 public:
 	SimpleObject(int x, int y) :
@@ -80,18 +102,53 @@ public:
 	SimpleObject(int node) :
 			Point(node) {
 	}
+	bool operator<(const SimpleObject &so) const { //used to sort the snippets vector from the closest to the farthest
+		return euclidianDistanceCells(darkMind.x, darkMind.y, this->x, this->y) < euclidianDistanceCells(darkMind.x, darkMind.y, so.x, so.y);
+	}
 };
 class ObjectWithRounds: public Point {
 public:
-	int rounds_or_type;
+	int rounds;
 	ObjectWithRounds(int x, int y, int rounds) :
-			Point(x, y), rounds_or_type(rounds) {
+			Point(x, y), rounds(rounds) {
 	}
 	ObjectWithRounds(int node, int rounds) :
-			Point(node), rounds_or_type(rounds) {
+			Point(node), rounds(rounds) {
 	}
 	ObjectWithRounds(int node) :
-			Point(node), rounds_or_type(-1) {
+			Point(node), rounds(-1) {
+	}
+};
+class Bug: public Point {
+public:
+	int type;
+	string direction;
+	Bug(int x, int y, int type) :
+			Point(x, y), type(type) {
+	}
+	Bug(int node, int type) :
+			Point(node), type(type) {
+	}
+	Bug(int node) :
+			Point(node), type(-1) {
+
+	}
+};
+class Cell: public Point {
+public:
+	float weight = 0.0;
+	Cell(int x, int y, float weight) :
+			Point(x, y), weight(weight) {
+	}
+	Cell(int node, float weight) :
+			Point(node), weight(weight) {
+	}
+	Cell(int node) :
+			Point(node), weight(0) {
+
+	}
+	Cell() :
+			Point(), weight(0) {
 	}
 };
 //class Cell: public Point{
@@ -109,11 +166,9 @@ int time_per_move;
 int time_remaining;
 int max_rounds;
 int current_round;
-Player darkMind;
-Player enemy;
 vector<SimpleObject> snippets;
 vector<ObjectWithRounds> weapons;
-vector<ObjectWithRounds> bugs;
+vector<Bug> bugs;
 vector<ObjectWithRounds> spawn_points;
 vector<ObjectWithRounds> gates;
 //vector<ObjectWithRounds> cells;
@@ -122,6 +177,7 @@ void choose_character();
 void do_move();
 
 bool** matrixAdiacents;
+Cell** matrixWeight;
 bool isSetWalls = false;
 int dx[4] = { 0, -1, 0, 1 };
 int dy[4] = { -1, 0, 1, 0 };
@@ -129,6 +185,7 @@ string moves[4] = { "up", "left", "down", "right" };
 void initAdiacents() {
 	for (int r = 0; r < height; r++) {
 		for (int c = 0; c < width; c++) {
+
 			int currentNode = pairToNode(r, c);
 			int adiacentNode;
 			for (int i = 0; i < 4; i++) {
@@ -140,6 +197,10 @@ void initAdiacents() {
 					matrixAdiacents[adiacentNode][currentNode] = 1;
 				}
 			}
+			Cell & cell = matrixWeight[r][c];
+			cell.x = c;
+			cell.y = r;
+			c = currentNode;
 		}
 	}
 }
@@ -184,11 +245,10 @@ void parseObjects(const string & objList, const int &cell) {
 				case 'P': {
 					int id = objs[i][1] - '0';
 					if (id == darkMind.id) {
-						darkMind.x = currentCoordinates.x;
-						darkMind.y = currentCoordinates.y;
+						darkMind.setPosition(currentCoordinates);
+
 					} else {
-						enemy.x = currentCoordinates.x;
-						enemy.y = currentCoordinates.y;
+						enemy.setPosition(currentCoordinates);
 					}
 				}
 					break;
@@ -215,7 +275,7 @@ void parseObjects(const string & objList, const int &cell) {
 					gates.push_back(ObjectWithRounds(cell, d));
 					break;
 				case 'E':
-					bugs.push_back(ObjectWithRounds(cell, objs[i][1] - '0'));
+					bugs.push_back(Bug(cell, objs[i][1] - '0'));
 					break;
 				case 'B':
 					weapons.push_back(ObjectWithRounds(cell, stoi(objs[i].erase(0, 1))));
@@ -232,6 +292,62 @@ void addAdiacentsGates() {
 		for (unsigned int j = 0; j < gates.size(); j++)
 			matrixAdiacents[gates[i].node][gates[j].node] = 1;
 
+}
+void weighs_cells() {
+	cerr << "quiquiquiquiquiquiquiqiuqiu" << endl;
+	for (int r = 0; r < height; r++) {
+		for (int c = 0; c < width; c++) {
+
+			matrixWeight[r][c].weight = 0;
+			for (unsigned int bug = 0; bug < bugs.size(); bug++) {
+				int bugCol = bugs[bug].x;
+				int bugRow = bugs[bug].y;
+				if (r < bugRow) {
+					float rPeso = 1 - ((bugRow - (1 + r)) / 10);
+
+					if (c <= bugCol) {
+					float cPeso = rPeso - bugCol - c;
+						matrixWeight[r][c].weight += cPeso > 0 ? cPeso : 0;
+					} else {
+						float cPeso = rPeso + ((bugCol - c) / 10);
+						matrixWeight[r][c].weight += cPeso < 1 ? cPeso : 1;
+
+					}
+				}
+				if (r == bugRow) {
+					if (c < bugCol) {
+						float p = 1 - ((bugCol - c - 1) / 10);
+						matrixWeight[r][c].weight += p > 0 ? p : 0;
+					} else {
+						if (c == bugCol) {
+						matrixWeight[r][c].weight = 1.5;
+					}
+					else {
+							float p = 1 - ((c - bugCol - 1) / 10);
+							matrixWeight[r][c].weight += p > 0 ? p : 0;
+						}
+					}
+			}
+				if (r > bugRow) {
+					float rPeso = 1 - ((bugRow - r + 1) / 10);
+					if (c <= bugCol) {
+						float cPeso = 1 - ((bugCol - c) / 10);
+						matrixWeight[r][c].weight += cPeso > 0 ? cPeso : 0;
+					} else {
+						float cPeso = rPeso - ((c - bugCol) / 10);
+						matrixWeight[r][c].weight += cPeso > 0 ? cPeso : 0;
+					}
+
+				}
+			}
+		}
+	}
+	for (int r = 0; r < height; r++)
+		{
+		for (int c = 0; c < width; c++)
+			cerr << matrixWeight[r][c].weight << "-";
+		cerr << endl;
+	}
 }
 void process_next_command() {
 	string command;
@@ -267,6 +383,9 @@ void process_next_command() {
 			for (int r = 0; r < numNodes; r++) {
 				matrixAdiacents[r] = new bool[numNodes] { 0 };
 			}
+			matrixWeight = new Cell*[height];
+				for (int i = 0; i < height; i++)
+					matrixWeight[i] = new Cell[width];
 			initAdiacents();
 		}
 
@@ -297,6 +416,9 @@ void process_next_command() {
 			if (!isSetWalls) //todo delete if the gates modify their direction
 				addAdiacentsGates();
 			isSetWalls = true;
+			sort(snippets.begin(), snippets.end());
+			weighs_cells();
+
 		} else if (type == "snippets") {
 			if (player_name == darkMind.name) {
 				cin >> darkMind.snippets;
@@ -330,10 +452,11 @@ int main() {
 	for (int i = 0; i < numNodes; i++) {
 		delete[] matrixAdiacents[i];
 	}
-	for (int i = 0; i < numNodes; i++) {
-		delete matrixAdiacents[i];
-	}
-	delete matrixAdiacents;
+		delete[] matrixAdiacents;
+		for (int i = 0; i < height; i++) {
+			delete[] matrixWeight[i];
+		}
+		delete[] matrixWeight;
 	return 0;
 }
 
@@ -369,13 +492,11 @@ float euclidianDistanceNode(const int & node1, const int & node2) {
 	Point p2 = nodeToPair(node2);
 	int sum1 = p1.x - p2.x;
 	int sum2 = p1.y - p2.y;
-	cout << sum1 << "       " << sum2 << endl;
 	return sqrt(pow(sum1, 2) + pow(sum2, 2));
 }
 float euclidianDistanceCells(const int & x1, const int & y1, const int & x2, const int & y2) {
 	int sum1 = x1 - x2;
 	int sum2 = y1 - y2;
-	cout << sum1 << "       " << sum2 << endl;
 	return sqrt(pow(sum1, 2) + pow(sum2, 2));
 }
 int getClosestPlayer(const int & posBegin) {
@@ -429,7 +550,6 @@ int getObjectiveGreenBugsTR(const int & posBegin) {
 		int xNew = p.y - 4;
 		if (xNew < 0) xNew = 0;
 		return pairToNode(xNew, p.x);
-		cout << "push" << endl;
 	} else if (p.direction == "down") {
 		int xNew = p.y + 4;
 		if (xNew > height - 1) xNew = height - 1;

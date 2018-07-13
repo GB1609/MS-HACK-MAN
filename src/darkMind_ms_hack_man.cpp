@@ -11,7 +11,8 @@ using namespace std;
 int width = -1;
 int height = -1;
 int numNodes = -1;
-
+static int turn = 0;
+static string precPath = "";
 ////////// let a pair of coordinates returns the corresponding node
 int pairToNode(const int & r, const int & c) {
 	return r * width + c;
@@ -29,7 +30,6 @@ int getObjectiveBlueBugsBL(const int& posBegin);
 string getPathMove(string path);
 string pathFind(bool** & adiacents, const int & posBegin, const int & posEnd);
 
-class Point;
 class Point {
 public:
 	int x;
@@ -61,13 +61,13 @@ public:
 		priority = 0;
 		level = 0;
 	}
-
+	;
 	Point(Point&& p) :
 			x(std::move(p.x)), y(std::move(p.y)), node(std::move(p.node)) {
 		priority = 0;
 		level = 0;
 	}
-
+	;
 	void updatePriority(/*const int & xDest, const int & yDest*/int heuristic) {
 		priority = level + heuristic; //A*
 	}
@@ -191,14 +191,13 @@ public:
 			Point(node), weight(weight) {
 	}
 	Cell(int node) :
-			Point(node), weight(0.0) {
+			Point(node), weight(0) {
 
 	}
 	Cell() :
-			Point(), weight(0.0) {
+			Point(), weight(0) {
 	}
 };
-//class Cell: public Point{
 template<char delimiter>
 class StringDelimitedBy: public string {
 
@@ -207,7 +206,6 @@ class StringDelimitedBy: public string {
 		return is;
 	}
 };
-//vector<vector<bool> > is_wall;
 int timebank;
 int time_per_move;
 int time_remaining;
@@ -245,16 +243,16 @@ void initAdiacents() {
 			cell.x = c;
 			cell.y = r;
 			cell.node = currentNode;
-			cell.weight = 0.0f;
 		}
 	}
+	for (int i = 0; i < numNodes; i++)
+		matrixAdiacents[i][i] = 0;
 }
 void removeAdiacents(int cell) {
 	Point cellCoordinate(cell);
 	for (int i = 0; i < 4; i++) {
 		int adiacentR = cellCoordinate.y + dy[i];
 		int adiacentC = cellCoordinate.x + dx[i];
-
 		if (adiacentR < height && adiacentR >= 0 && adiacentC < width && adiacentC >= 0) {
 			int adiacentNode = pairToNode(adiacentR, adiacentC);
 			matrixAdiacents[cell][adiacentNode] = 0;
@@ -386,7 +384,7 @@ void weighs_cells() {
 		}
 	}
 	if (bugs.size() != 0) {
-		for (unsigned int i = 0; i < bugs.size(); i++)
+		for (int i = 0; i < bugs.size(); i++)
 			cerr << bugs[i].y << "---" << bugs[i].x << endl;
 		cerr << "llllllllllllllllllllllllllllll" << endl;
 		for (int r = 0; r < height; r++) {
@@ -511,25 +509,36 @@ void choose_character() {
 }
 
 void do_move() {
-	string path = "";
-	vector<string> paths(snippets.size()); //mi serve a me gb
+	cerr << "start turn: " << turn << endl;
+	string path = "", path2 = "";
+	vector<string> myPath(snippets.size()); //mi serve a me gb
+	vector<string> enPath(snippets.size()); //mi serve a me gb
 	unsigned int min = width * height;
 	int pathToPrint = -1;
 	for (unsigned int i = 0; i < snippets.size(); i++) {
-//		cerr << "snippet pos:" << snippets[i].node << endl;
-//		cerr << "dm pos:" << darkMind.node << endl;
 		path = pathFind(matrixAdiacents, darkMind.node, snippets[i].node);
-		paths[i] = path;
+		cerr << path << " to go to snippets " << snippets[i].node << "(" << snippets[i].y << "," << snippets[i].x << ")" << endl;
+		path2 = pathFind(matrixAdiacents, enemy.node, snippets[i].node);
+		myPath[i] = path;
+		enPath[i] = path2;
 		if (path.length() < min && path.length() > 0) {
 			min = path.length();
 			pathToPrint = i;
 		}
 	}
-//	cerr << "PATH: " << paths[pathToPrint] << "to snippets:" << snippets[pathToPrint].node << "("
-//			<< snippets[pathToPrint].y << "," << snippets[pathToPrint].x << ")" << endl;
-	if (paths[pathToPrint] == "" || paths[pathToPrint] == "error") {
+	if (precPath != "" && precPath.length() < min) {
+		cout << getPathMove(precPath) << endl;
+		precPath = precPath.substr(1, myPath[pathToPrint].length());
+	} else if (pathToPrint == -1 || myPath[pathToPrint] == "" || myPath[pathToPrint] == "error") {
 		cout << "pass" << endl;
-	} else cout << getPathMove(paths[pathToPrint]) << endl;
+		precPath = "";
+	} else {
+		cout << getPathMove(myPath[pathToPrint]) << endl;
+		precPath = myPath[pathToPrint].substr(1, myPath[pathToPrint].length());
+	}
+	cerr << "END TURN: " << turn << endl;
+	turn++;
+
 }
 
 float euclidianDistanceNode(const int & node1, const int & node2) {
@@ -661,15 +670,14 @@ string getPathMove(string path) {
 	else if (toVerify == '3') return "left";
 	return "error";
 }
-string pathFind(bool** & adiacents, const int & posBegin, const int & posEnd) {
+string pathFind(bool** &adiacents, const int & posBegin, const int & posEnd) {
 	int xStart = nodeToPair(posBegin).y;
-	int yStart = nodeToPair(posBegin).x;
 	int xFinish = nodeToPair(posEnd).y;
+	int yStart = nodeToPair(posBegin).x;
 	int yFinish = nodeToPair(posEnd).x;
-	int dx[4] = { 1, 0, -1, 0 };
-	int dy[4] = { 0, 1, 0, -1 };
-	if (xStart < 0 || yStart < 0 || xStart >= width || yStart >= height || xFinish < 0 || yFinish < 0 || xFinish >= width || yFinish >= height) {
-		return "";
+
+	if (xStart < 0 || yStart < 0 || xFinish < 0 || yFinish < 0 || xStart >= height || yStart >= width) {
+		return "pass";
 	}
 	static priority_queue<Point> pq[2]; // list of open (not-yet-tried) nodes
 	static int pqi; // pq index
@@ -677,11 +685,13 @@ string pathFind(bool** & adiacents, const int & posBegin, const int & posEnd) {
 	static Point* m0;
 	static int i, j, x, y, xdx, ydy;
 	int dir_map[numNodes][numNodes]; // map of directions
+	static int dx[4] = { 1, 0, -1, 0, };
+	static int dy[4] = { 0, 1, 0, -1 };
 	static char c;
-	int possibleDirection = 4;
-	pqi = 0;
 	int closed_nodes_map[numNodes][numNodes];
 	int open_nodes_map[numNodes][numNodes];
+	int possibleDirection = 4;
+	pqi = 0;
 	for (y = 0; y < numNodes; y++) {
 		for (x = 0; x < numNodes; x++) {
 			closed_nodes_map[x][y] = 0;
@@ -689,9 +699,8 @@ string pathFind(bool** & adiacents, const int & posBegin, const int & posEnd) {
 		}
 	}
 	n0 = new Point(xStart, yStart, 0, 0);
-//	int nodeS = pairToNode(xStart, yStart);
-//	int est = estimatedCost(adiacents, nodeS, nodeS, direction);
-	int est = 1;
+	int nodeS = pairToNode(xStart, yStart);
+	int est = euclidianDistanceNode(nodeS, posEnd);
 	n0->updatePriority(est);
 	pq[pqi].push(*n0);
 	open_nodes_map[x][y] = n0->getPriority(); // mark it on the open nodes map
@@ -730,7 +739,7 @@ string pathFind(bool** & adiacents, const int & posBegin, const int & posEnd) {
 				m0 = new Point(xdx, ydy, n0->getLevel(), n0->getPriority());
 				m0->nextLevel(i);
 //				int cost = estimatedCost(adiacents, nodeStart, nodeNext, direction);
-				int cost = 0;
+				int cost = euclidianDistanceNode(nodeStart, nodeNext);
 				m0->updatePriority(cost);
 
 				if (open_nodes_map[xdx][ydy] == 0) {

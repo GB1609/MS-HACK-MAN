@@ -61,13 +61,13 @@ public:
 		priority = 0;
 		level = 0;
 	}
-	;
+
 	Point(Point&& p) :
 			x(std::move(p.x)), y(std::move(p.y)), node(std::move(p.node)) {
 		priority = 0;
 		level = 0;
 	}
-	;
+
 	void updatePriority(/*const int & xDest, const int & yDest*/int heuristic) {
 		priority = level + heuristic; //A*
 	}

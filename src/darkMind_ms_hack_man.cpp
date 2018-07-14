@@ -455,6 +455,7 @@ void process_next_command() {
 		} else if (type == "player_names") {
 			string names;
 			cin >> names;
+			// player names aren't very useful
 		} else if (type == "your_bot") {
 			cin >> darkMind.name;
 		} else if (type == "your_botid") {
@@ -467,6 +468,9 @@ void process_next_command() {
 			cin >> max_rounds;
 		}
 		if (width != -1 && height != -1) {
+			//int tmp=width;
+			//width=height;
+			//height=tmp;
 			numNodes = width * height;
 			matrixAdiacents = new bool*[numNodes];
 			for (int r = 0; r < numNodes; r++) {
@@ -560,10 +564,8 @@ void do_move() {
 		vector<int> temp = pathFindGB(darkMind.node, snippets[i].node);
 		vector<int> tempEn = pathFindGB(enemy.node, snippets[i].node);
 		if (temp.size() < min && temp.size() > 0) {
-			if (tempEn.size() == 0 || tempEn.size() > temp.size()) {
-				min = temp.size();
-				toPrint = temp[temp.size() - 1];
-			}
+			min = temp.size();
+			toPrint = temp[temp.size() - 1];
 		}
 	}
 	if (toPrint == -1 || getMoveGB(darkMind.node, toPrint) == "pass") {
@@ -701,12 +703,12 @@ string pathFind(const int & posBegin, const int & posEnd) {
 	if (xStart < 0 || yStart < 0 || xFinish < 0 || yFinish < 0 || xStart >= height || yStart >= width) {
 		return "pass";
 	}
-	static priority_queue<Point> pq[2];
+	static priority_queue<Point> pq[2]; // list of open (not-yet-tried) nodes
 	static int pqi; // pq index
 	static Point* n0;
 	static Point* m0;
 	static int i, j, x, y, xdx, ydy;
-	int dir_map[numNodes][numNodes];
+	int dir_map[numNodes][numNodes]; // map of directions
 	static char c;
 	int closed_nodes_map[numNodes][numNodes];
 	float open_nodes_map[numNodes][numNodes];
@@ -817,14 +819,18 @@ vector<int> pathFindGB(const int & posBegin, const int & posEnd) {
 	bool found = false;
 	vector<int> disc;
 	NodeGB bestNode(numNodes, 0, disc);
+	// Mark all the vertices as not visited
 	bool visited[numNodes];
 	for (int i = 0; i < numNodes; i++)
 		visited[i] = false;
+	// Create a queue for BFS
 	queue<NodeGB> queue;
+	// Mark the current node as visited and enqueue it
 	visited[posBegin] = true;
 	NodeGB start(posBegin, 0, disc);
 	queue.push(start);
 	while (!queue.empty()) {
+		// Dequeue a vertex from queue and print it
 		NodeGB s = queue.front();
 		if (s.node == posEnd) {
 			if (found && s.cost < bestNode.cost) {
@@ -846,6 +852,7 @@ vector<int> pathFindGB(const int & posBegin, const int & posEnd) {
 				NodeGB temp(ad[i], euclidianDistanceNode(ad[i], posEnd) + s.cost, dis);
 				if (found && temp.cost < bestNode.cost) queue.push(temp);
 				else if (!found) queue.push(temp);
+
 			}
 		}
 	}

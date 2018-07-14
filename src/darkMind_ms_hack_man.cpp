@@ -32,11 +32,11 @@ string pathFind(bool** & adiacents, const int & posBegin, const int & posEnd);
 
 class Point {
 public:
-	int x;
-	int y;
+	int x = -1;
+	int y = -1;
 	int node;
-	int level; //ELENA SERVONO PER IL PATH, a priority andra il costo
-	int priority;
+	float level; //ELENA SERVONO PER IL PATH, a priority andra il costo
+	float priority;
 	Point() // @suppress("Class members should be properly initialized")
 	{
 	}
@@ -67,7 +67,8 @@ public:
 		priority = 0;
 		level = 0;
 	}
-	void updatePriority(/*const int & xDest, const int & yDest*/int heuristic) {
+
+	void updatePriority(/*const int & xDest, const int & yDest*/float heuristic) {
 		priority = level + heuristic; //A*
 	}
 	void nextLevel(const int & i) // i: direction
@@ -123,6 +124,11 @@ public:
 	int snippets;
 	int bombs;
 	void setPosition(int r, int c) {
+		if (c > x) direction = "right";
+		else if (c < x) direction = "left";
+		else if (r < y) direction = "up";
+		else if (r > y) direction = "down";
+		else direction = "pass";
 		x = c;
 		y = r;
 		node = pairToNode(r, c);
@@ -197,6 +203,7 @@ public:
 			Point(), weight(0) {
 	}
 };
+//class Cell: public Point{
 template<char delimiter>
 class StringDelimitedBy: public string {
 
@@ -205,6 +212,7 @@ class StringDelimitedBy: public string {
 		return is;
 	}
 };
+//vector<vector<bool> > is_wall;
 int timebank;
 int time_per_move;
 int time_remaining;
@@ -333,7 +341,6 @@ void addAdiacentsGates() {
 	for (unsigned int i = 0; i < gates.size(); i++)
 		for (unsigned int j = 0; j < gates.size(); j++)
 			matrixAdiacents[gates[i].node][gates[j].node] = 1;
-
 }
 void weighs_cells() {
 	for (int r = 0; r < height; r++) {
@@ -382,16 +389,16 @@ void weighs_cells() {
 			}
 		}
 	}
-	if (bugs.size() != 0) {
-		for (int i = 0; i < bugs.size(); i++)
-			cerr << bugs[i].y << "---" << bugs[i].x << endl;
-		cerr << "llllllllllllllllllllllllllllll" << endl;
-		for (int r = 0; r < height; r++) {
-			for (int c = 0; c < width; c++)
-				cerr << matrixWeight[r][c].weight << "-";
-			cerr << endl;
-		}
-	}
+//  if(bugs.size()!=0){
+//      for(int i=0;i<bugs.size();i++)
+//      cerr<<bugs[i].y<<"---"<<bugs[i].x<<endl;
+//  cerr<<"llllllllllllllllllllllllllllll"<<endl;
+//  for (int r = 0; r < height; r++)
+//  {
+//    for (int c = 0; c < width; c++)
+//      cerr << matrixWeight[r][c].weight << "-";
+//    cerr << endl;
+//    }}
 }
 void process_next_command() {
 	string command;
@@ -459,6 +466,7 @@ void process_next_command() {
 			}
 			if (!isSetWalls) //todo delete if the gates modify their direction
 				addAdiacentsGates();
+
 			isSetWalls = true;
 			sort(snippets.begin(), snippets.end());
 			weighs_cells();
@@ -488,7 +496,9 @@ void process_next_command() {
 		}
 	}
 }
-
+void choose_character() {
+	cout << "bixiette" << endl;
+}
 int main() {
 	while (true) {
 		process_next_command();
@@ -503,32 +513,44 @@ int main() {
 	delete[] matrixWeight;
 	return 0;
 }
-void choose_character() {
-	cout << "bixiette" << endl;
-}
 
 void do_move() {
 	cerr << "start turn: " << turn << endl;
-	string path = "", path2 = "";
+	string path = "", ePath = "";
+	if (!gates.empty()) {
+	cerr << "0 to 1---" << matrixAdiacents[gates[0].node][gates[1].node] << endl;
+		cerr << "1 to 0----" << matrixAdiacents[gates[1].node][gates[0].node] << endl;
+	}
+
 	vector<string> myPath(snippets.size()); //mi serve a me gb
 	vector<string> enPath(snippets.size()); //mi serve a me gb
 	unsigned int min = width * height;
 	int pathToPrint = -1;
+	cerr << "snipped" << endl;
+	for (int i = 0; i < snippets.size(); i++) {
+		cerr << snippets[i].y << "-" << snippets[i].x << endl;
+	}
+	cerr << "ddddd" << endl;
+
+	for (int i = 0; i < 4; i++) {
+		if (!snippets.empty()) cerr << "dir" << i << euclidianDistanceCells(darkMind.x + dx[i], darkMind.y + dy[i], snippets[0].x, snippets[0].y) << endl;
+
+	}
 	for (unsigned int i = 0; i < snippets.size(); i++) {
 		path = pathFind(matrixAdiacents, darkMind.node, snippets[i].node);
 		cerr << path << " to go to snippets " << snippets[i].node << "(" << snippets[i].y << "," << snippets[i].x << ")" << endl;
-		path2 = pathFind(matrixAdiacents, enemy.node, snippets[i].node);
+		ePath = pathFind(matrixAdiacents, enemy.node, snippets[i].node);
 		myPath[i] = path;
-		enPath[i] = path2;
-		if (path.length() < min && path.length() > 0) {
+		enPath[i] = ePath;
+		if (path.length() < min && path.length() > 0 /*&& (path.length() < ePath.length() && ePath.length() > 0)*/) {
 			min = path.length();
 			pathToPrint = i;
 		}
 	}
-	if (precPath != "" && precPath.length() < min) {
+	if (precPath != "" && precPath.length() <= min) {
 		cout << getPathMove(precPath) << endl;
 		precPath = precPath.substr(1, myPath[pathToPrint].length());
-	} else if (pathToPrint == -1 || myPath[pathToPrint] == "" || myPath[pathToPrint] == "error") {
+	} else if (pathToPrint == -1 || myPath[pathToPrint] == "pass") {
 		cout << "pass" << endl;
 		precPath = "";
 	} else {
@@ -663,11 +685,11 @@ int getObjectiveBlueBugsBL(const int& posBegin) {
 }
 string getPathMove(string path) {
 	char toVerify = path[0];
-	if (toVerify == '0') return "down";
-	else if (toVerify == '1') return "right";
-	else if (toVerify == '2') return "up";
-	else if (toVerify == '3') return "left";
-	return "error";
+	if (toVerify == '0') return "left";
+	else if (toVerify == '1') return "up";
+	else if (toVerify == '2') return "right";
+	else if (toVerify == '3') return "down";
+	return "pass";
 }
 string pathFind(bool** &adiacents, const int & posBegin, const int & posEnd) {
 	int xStart = nodeToPair(posBegin).y;
@@ -684,8 +706,6 @@ string pathFind(bool** &adiacents, const int & posBegin, const int & posEnd) {
 	static Point* m0;
 	static int i, j, x, y, xdx, ydy;
 	int dir_map[numNodes][numNodes]; // map of directions
-	static int dx[4] = { 1, 0, -1, 0, };
-	static int dy[4] = { 0, 1, 0, -1 };
 	static char c;
 	int closed_nodes_map[numNodes][numNodes];
 	int open_nodes_map[numNodes][numNodes];
@@ -699,7 +719,7 @@ string pathFind(bool** &adiacents, const int & posBegin, const int & posEnd) {
 	}
 	n0 = new Point(xStart, yStart, 0, 0);
 	int nodeS = pairToNode(xStart, yStart);
-	int est = euclidianDistanceNode(nodeS, posEnd);
+	float est = euclidianDistanceNode(nodeS, posEnd);
 	n0->updatePriority(est);
 	pq[pqi].push(*n0);
 	open_nodes_map[x][y] = n0->getPriority(); // mark it on the open nodes map
@@ -738,8 +758,7 @@ string pathFind(bool** &adiacents, const int & posBegin, const int & posEnd) {
 				m0 = new Point(xdx, ydy, n0->getLevel(), n0->getPriority());
 				m0->nextLevel(i);
 //				int cost = estimatedCost(adiacents, nodeStart, nodeNext, direction);
-				int cost = euclidianDistanceNode(nodeStart, nodeNext);
-				m0->updatePriority(cost);
+				m0->updatePriority(euclidianDistanceNode(m0->node, posEnd));
 
 				if (open_nodes_map[xdx][ydy] == 0) {
 					open_nodes_map[xdx][ydy] = m0->getPriority();
@@ -767,5 +786,5 @@ string pathFind(bool** &adiacents, const int & posBegin, const int & posEnd) {
 		}
 		delete n0; // garbage collection
 	}
-	return ""; // no route found
+	return "pass"; // no route found
 }

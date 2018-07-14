@@ -8,6 +8,7 @@
 #include <iterator>
 #include <cmath>
 #include <list>
+#include <climits>
 using namespace std;
 int width = -1;
 int height = -1;
@@ -69,7 +70,6 @@ public:
 		return node;
 	}
 };
-
 class Point {
 public:
 	int x = -1;
@@ -190,7 +190,6 @@ public:
 	}
 
 };
-
 Player darkMind;
 Player enemy;
 class SimpleObject: public Point {
@@ -247,8 +246,6 @@ public:
 
 	}
 };
-
-//class Cell: public Point{
 template<char delimiter>
 class StringDelimitedBy: public string {
 
@@ -257,7 +254,6 @@ class StringDelimitedBy: public string {
 		return is;
 	}
 };
-//vector<vector<bool> > is_wall;
 int timebank;
 int time_per_move;
 int time_remaining;
@@ -268,10 +264,8 @@ vector<ObjectWithRounds> weapons;
 vector<Bug> bugs;
 vector<ObjectWithRounds> spawn_points;
 vector<ObjectWithRounds> gates;
-
 void choose_character();
 void do_move();
-
 bool isSetWalls = false;
 void initAdiacents() {
 	for (int r = 0; r < height; r++) {
@@ -425,11 +419,10 @@ void weigths_cells() {
 
 					}
 				}
-
-				//if (r > bugRow &&inMatrix(r-1,c)&& !matrixAdiacents[pairToNode(r - 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
-				//if (r < bugRow &&inMatrix(r+1,c)&& !matrixAdiacents[pairToNode(r + 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
-				//if (c > bugRow &&inMatrix(r,c-1)&& !matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
-				//if (c > bugRow && inMatrix(r,c+1)&&!matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
+				if (r > bugRow && inMatrix(r - 1, c) && !matrixAdiacents[pairToNode(r - 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
+				if (r < bugRow && inMatrix(r + 1, c) && !matrixAdiacents[pairToNode(r + 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
+				if (c > bugRow && inMatrix(r, c - 1) && !matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
+				if (c > bugRow && inMatrix(r, c + 1) && !matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
 				if (matrixWeight[r][c].weight > cPeso) matrixWeight[r][c].weight += 0.1;
 				else if (matrixWeight[r][c].weight > 0.0) matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso + 0.1 : 0.0;
 				else matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso : 0.0;
@@ -571,40 +564,47 @@ string getSafeDir() {
 //	cerr << cSafe.x << "--" << cSafe.y << endl;
 	return getMoveGB(darkMind.node, cSafe.node);
 }
+bool safeDir(const int& toGo) {
+	float weightToGo = matrixWeight[nodeToPair(toGo).y][nodeToPair(toGo).x].weight;
+	float weightDM = matrixWeight[darkMind.y][darkMind.x].weight;
+	if (weightToGo <= 0.75 || weightDM > weightToGo) return true;
+	return false;
+}
 Point dirToCell(string s) {
-
 	if (s == "left") return std::move(Point(darkMind.x - 1, darkMind.y));
 	if (s == "up") return std::move(Point(darkMind.x, darkMind.y - 1));
 	if (s == "right") return std::move(Point(darkMind.x + 1, darkMind.y));
 	if (s == "down") return std::move(Point(darkMind.x, darkMind.y + 1));
 	return std::move(Point(darkMind.x, darkMind.y));
-
 }
 void do_move() {
-
 	cerr << "start turn: " << turn << endl;
 	cerr << "my pos:" << darkMind.node << "     enemy pos:" << enemy.node << endl;
 	int toPrint = -1;
-	unsigned int min = width * height;
-	if (matrixWeight[darkMind.y][darkMind.x].weight >= 1.0) cout << getSafeDir() << endl;
-	else {
-		vector<SimpleObject> toScan(snippets);
-		for (unsigned int a = 0; a < weapons.size(); a++)
-			if (weapons[a].rounds == -1) toScan.push_back(SimpleObject(weapons[a].node));
-		sort(toScan.begin(), toScan.end());
-		for (unsigned int i = 0; i < toScan.size(); i++) {
-			vector<int> temp = pathFindGB(darkMind.node, toScan[i].node);
-			vector<int> tempEn = pathFindGB(enemy.node, toScan[i].node);
-			if (temp.size() > 0 && tempEn.size() >= temp.size() && temp.size() < min) {
-				toPrint = temp[temp.size() - 1];
-				min = temp.size();
-			}
+	int toPrintBestDied = -1;
+	unsigned int min = INT_MAX;
+	unsigned int minBestDied = INT_MAX;
+	vector<SimpleObject> toScan(snippets);
+	for (unsigned int a = 0; a < weapons.size(); a++)
+		if (weapons[a].rounds == -1) toScan.push_back(SimpleObject(weapons[a].node));
+	sort(toScan.begin(), toScan.end());
+	for (unsigned int i = 0; i < toScan.size(); i++) {
+		vector<int> temp = pathFindGB(darkMind.node, toScan[i].node);
+		vector<int> tempEn = pathFindGB(enemy.node, toScan[i].node);
+		unsigned int pathChoicher = temp[temp.size() - 1];
+		int toGO = temp[temp.size() - 2];
+		if (temp.size() > 0 && tempEn.size() >= temp.size() && (pathChoicher < min || pathChoicher < minBestDied)) {
+			(safeDir(toGO) && pathChoicher < min) ? toPrint = toGO : toPrint;
+			(!safeDir(toGO) && pathChoicher < minBestDied) ? toPrintBestDied = toGO : toPrintBestDied;
+			(pathChoicher < min && safeDir(toGO)) ? min = pathChoicher : min;
+			(pathChoicher < minBestDied && !safeDir(toGO)) ? minBestDied = pathChoicher : minBestDied;
 		}
-		if (toPrint == -1) {
-			vector<int> toCe = pathFindGB(darkMind.node, centerNode);
-			(toCe.size() > 0) ? cout << getMoveGB(darkMind.node, toCe[toCe.size() - 1]) << endl : cout << "pass" << endl;
-		} else cout << getMoveGB(darkMind.node, toPrint) << endl;
 	}
+	if (toPrint == -1 && toPrintBestDied == -1) {
+		vector<int> toCe = pathFindGB(darkMind.node, centerNode);
+		(toCe.size() > 0 && safeDir(toCe[toCe.size() - 2])) ? cout << getMoveGB(darkMind.node, toCe[toCe.size() - 2]) << endl : cout << getSafeDir() << endl;
+	} else if (toPrint == -1) cout << getMoveGB(darkMind.node, toPrintBestDied) << endl;
+	else cout << getMoveGB(darkMind.node, toPrint) << endl;
 	cerr << "END TURN: " << turn << endl;
 	turn++;
 }
@@ -754,29 +754,32 @@ vector<int> pathFindGB(const int & posBegin, const int & posEnd) {
 		queue.pop();
 		vector<int> ad = getAdiacentsNode(s.node);
 		for (unsigned int i = 0; i < ad.size(); i++) {
+			int x = nodeToPair(ad[i]).x;
+			int y = nodeToPair(ad[i]).y;
 			if (!visited[ad[i]]) {
 				visited[ad[i]] = true;
+//				if (matrixWeight[y][x].weight < 0.91) {
 				vector<int> dis(s.discendenza.size());
 				for (unsigned int a = 0; a < dis.size(); a++)
 					dis[a] = s.discendenza[a];
 				dis.push_back(s.node);
 				float cost = euclidianDistanceNode(ad[i], posEnd) + s.cost;
-				int x = nodeToPair(ad[i]).x;
-				int y = nodeToPair(ad[i]).y;
-				if (matrixWeight[y][x].weight >= 0.8) cost *= (cost * matrixWeight[y][x].weight);
+				if (matrixWeight[y][x].weight >= 0.75) cost *= (cost * matrixWeight[y][x].weight);
 				NodeGB temp(ad[i], cost, dis);
 				if (found && temp.cost < bestNode.cost) queue.push(temp);
 				else if (!found) queue.push(temp);
-
 			}
 		}
+//		}
 	}
 	vector<int> toReturn;
 	if (bestNode.node == numNodes) return toReturn;
 	else {
+		int pathChoicher = (bugs.empty()) ? bestNode.discendenza.size() : (bestNode.cost + bestNode.discendenza.size()) / 2;
 		toReturn.push_back(posEnd);
 		for (int i = bestNode.discendenza.size() - 1; i > 0; i--)
 			toReturn.push_back(bestNode.discendenza[i]);
+		toReturn.push_back(pathChoicher);
 		return toReturn;
 	}
 	return toReturn;

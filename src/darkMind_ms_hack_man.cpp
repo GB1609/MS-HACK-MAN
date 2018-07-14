@@ -26,6 +26,7 @@ int getFartherPlayer(const int & posBegin);
 int getObjectiveRedBugsTL(const int & posBegin);
 int getObjectiveGreenBugsTR(const int & posBegin);
 int getObjectiveYellowBugsBR(const int& posBegin);
+
 int getObjectiveBlueBugsBL(const int& posBegin);
 string getPathMove(string path);
 string pathFind(bool** & adiacents, const int & posBegin, const int & posEnd);
@@ -438,7 +439,7 @@ void weighs_cells() {
 		}
 	}
 	if (bugs.size() != 0) {
-		for (int i = 0; i < bugs.size(); i++)
+		for (unsigned int i = 0; i < bugs.size(); i++)
 			cerr << bugs[i].y << "---" << bugs[i].x << endl;
 		cerr << "llllllllllllllllllllllllllllll" << endl;
 		for (int r = 0; r < height; r++) {

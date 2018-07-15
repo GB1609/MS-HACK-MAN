@@ -450,13 +450,13 @@ void weigths_cells() {
 }
 bool inAdiacentDiAdiacent(int node) {
 	vector<int> ad = getAdiacentsNode(node);
-	for (int i = 0; i < ad.size(); i++) {
-		for (int bug = 0; bug < bugs.size(); bug++) {
+	for (unsigned int i = 0; i < ad.size(); i++) {
+		for (unsigned int bug = 0; bug < bugs.size(); bug++) {
 			if (bugs[bug].node == ad[i]) {
 				vector<int> ad2 = getAdiacentsNode(bugs[bug].node);
 				ad2.push_back(ad[i]);
-				for (int j = 0; j < ad2.size(); j++) {
-					for (int bug2 = 0; bug2 < bugs.size(); bug2++) {
+				for (unsigned int j = 0; j < ad2.size(); j++) {
+					for (unsigned int bug2 = 0; bug2 < bugs.size(); bug2++) {
 						if (bug != bug2 && bugs[bug2].node == ad2[j]) {
 							return true;
 						}
@@ -599,7 +599,16 @@ string getSafeDir() {
 	for (unsigned int i = 0; i < nodes.size(); i++)
 		adiacents.push_back(matrixWeight[nodeToPair(nodes[i]).y][nodeToPair(nodes[i]).x]);
 	sort(adiacents.begin(), adiacents.end());
-	Cell & cSafe = adiacents[0];
+	int toR = 0;
+	if (adiacents[0].weight == adiacents[1].weight || abs(adiacents[0].weight - adiacents[1].weight) == 0.1) {
+		float min = 0;
+		for (unsigned int a = 0; a < gates.size(); a++) {
+			float e0 = euclidianDistanceNode(adiacents[0].node, gates[a].node), e1 = euclidianDistanceNode(adiacents[1].node, gates[a].node);
+			if (e0 < e1 && e0 < min) toR = 0;
+			if (e1 < e0 && e1 < min) toR = 1;
+		}
+	}
+	Cell & cSafe = adiacents[toR];
 //	cerr << cSafe.x << "--" << cSafe.y << endl;
 	return getMoveGB(darkMind.node, cSafe.node);
 }
@@ -651,42 +660,53 @@ bool sureToGo(const int& toGo, const int& dm) {
 	float weightToGo = getWeight(toGo);
 	float weightDM = getWeight(dm);
 	if (weightToGo <= 0.70 || weightDM >= weightToGo) return true;
-//	for(unsigned int i=0;i<bugs.size();i++)
-//		if(euclidianDistanceNode(bugs[i].node,toGo)<2.7)
-//			return false;
+	for (unsigned int i = 0; i < bugs.size(); i++)
+		if (euclidianDistanceNode(bugs[i].node, toGo) < 2.4) return false;
 	return true;
 }
 map<ObjectWithRounds, vector<int> > checkDangerNode();
 vector<int> getDangerNodes(ObjectWithRounds bomb);
+vector<SimpleObject> toScan;
 void do_move() {
 	cerr << "start turn: " << turn << endl;
 	cerr << "my pos:" << darkMind.node << "     enemy pos:" << enemy.node << endl;
 	int toPrint = -1;
 	unsigned int min = INT_MAX;
-	vector<SimpleObject> toScan(snippets);
-	for (unsigned int a = 0; a < weapons.size(); a++)
-		if (weapons[a].rounds == -1) toScan.push_back(SimpleObject(weapons[a].node));
-	sort(toScan.begin(), toScan.end());
-	for (unsigned int i = 0; i < toScan.size(); i++) {
-		vector<int> temp = pathFindGB(darkMind.node, toScan[i].node);
-		cerr << "path to " << toScan[i].node << ": ";
-		for (unsigned int a = 0; a < temp.size(); a++)
-			cerr << temp[a] << ",";
-		cerr << endl;
-		vector<int> tempEn = pathFindGB(enemy.node, toScan[i].node);
-		int toGO = temp[temp.size() - 1];
+//	if ((inAdiacentDiAdiacent(darkMind.node)) ? getWeight(darkMind.node) >= 1.0 : getWeight(darkMind.node) >= 0.9) cout << getSafeDir() << endl;
+//	else {
+		if (weightChange) {
+			toScan = vector<SimpleObject>(snippets);
+			for (unsigned int a = 0; a < weapons.size(); a++) {
+				if (weapons[a].rounds == -1) toScan.push_back(SimpleObject(weapons[a].node));
+			}
+			sort(toScan.begin(), toScan.end());
+		}
+		for (unsigned int i = 0; i < toScan.size(); i++) {
+			vector<int> temp = pathFindGB(darkMind.node, toScan[i].node);
+			cerr << "path to " << toScan[i].node << ": ";
+			for (unsigned int a = 0; a < temp.size(); a++)
+				cerr << temp[a] << ",";
+			cerr << endl;
+			vector<int> tempEn = pathFindGB(enemy.node, toScan[i].node);
+			int toGO = temp[temp.size() - 1];
 		int aroundV = numbersBonusNear(toGO, around);
 		unsigned int pathChoicher = temp.size() - aroundV;
-		if (temp.size() > 0 && tempEn.size() >= temp.size() && sureToGo(toGO, darkMind.node)) {
-			toPrint = toGO;
+		if (temp.size() > 0 && tempEn.size() >= pathChoicher && pathChoicher < min && sureToGo(toGO, darkMind.node)) {
+				toPrint = toGO;
+//				break;
 			min = pathChoicher;
-			break;
+			}
 		}
-	}
-	if (toPrint == -1) {
-		vector<int> toCe = pathFindGB(darkMind.node, centerNode);
-		(toCe.size() > 0) ? cout << getMoveGB(darkMind.node, toCe[toCe.size() - 2]) << endl : cout << "pass" << endl;
-	} else cout << getMoveGB(darkMind.node, toPrint) << endl;
+		cerr << "CHOICHE: ";
+		if (toPrint == -1) {
+			vector<int> toCe = pathFindGB(darkMind.node, centerNode);
+			(toCe.size() > 0) ? cout << getMoveGB(darkMind.node, toCe[toCe.size() - 1]) << endl : cout << getSafeDir() << endl;
+			cerr << "GO TO CENTER" << endl;
+		} else {
+			cout << getMoveGB(darkMind.node, toPrint) << endl;
+			cerr << "GO TO " << toPrint << endl;
+		}
+//	}
 	cerr << "END TURN: " << turn << endl;
 	turn++;
 }
@@ -894,7 +914,7 @@ vector<int> pathFindGB(const int & posBegin, const int & posEnd) {
 				dis.push_back(s.node);
 				float cost = euclidianDistanceNode(ad[i], posEnd) + s.cost;
 				int w = getWeight(ad[i]);
-				if (w >= 0.75) cost *= (cost * w);
+				if (w >= 0.75 && dis.size() < 5) cost *= (cost * w);
 				NodeGB temp(ad[i], cost, dis);
 				if (found && temp.cost < bestNode.cost) queue.push(temp);
 				else if (!found) queue.push(temp);

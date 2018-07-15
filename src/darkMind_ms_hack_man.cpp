@@ -17,7 +17,6 @@ int numNodes = -1;
 int centerNode = -1;
 static int turn = 0;
 static int around = 3;
-////////// let a pair of coordinates returns the corresponding node
 int pairToNode(const int & r, const int & c) {
 	return r * width + c;
 }
@@ -37,6 +36,11 @@ string getMoveGB(int begin, int move) {
 	else if (begin - width == move) return "up";
 	return "pass";
 }
+bool weightChange = true;
+unsigned int precBugNumber = 0;
+unsigned int precWeaponNumber = 0;
+unsigned int precSnippetNumber = 0;
+float precWeight = 0.0f;
 vector<int> pathFindGB(const int & posBegin, const int & posEnd);
 int numbersBonusNear(const int& node, const int& circle);
 class NodeGB {
@@ -444,6 +448,25 @@ void weigths_cells() {
 //    cerr << endl;
 //    }}
 }
+bool inAdiacentDiAdiacent(int node) {
+	vector<int> ad = getAdiacentsNode(node);
+	for (int i = 0; i < ad.size(); i++) {
+		for (int bug = 0; bug < bugs.size(); bug++) {
+			if (bugs[bug].node == ad[i]) {
+				vector<int> ad2 = getAdiacentsNode(bugs[bug].node);
+				ad2.push_back(ad[i]);
+				for (int j = 0; j < ad2.size(); j++) {
+					for (int bug2 = 0; bug2 < bugs.size(); bug2++) {
+						if (bug != bug2 && bugs[bug2].node == ad2[j]) {
+							return true;
+						}
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
 void process_next_command() {
 	string command;
 	cin >> command;
@@ -514,6 +537,18 @@ void process_next_command() {
 			isSetWalls = true;
 			sort(snippets.begin(), snippets.end());
 			weigths_cells();
+			if (bugs.size() != precBugNumber || weapons.size() != precWeaponNumber || snippets.size() != precSnippetNumber || current_round < 2
+					|| (inAdiacentDiAdiacent(darkMind.node) ?
+							(matrixWeight[darkMind.y][darkMind.x].weight >= 0.9 && precWeight < 0.9)
+									|| (matrixWeight[darkMind.y][darkMind.x].weight >= 0.9 && matrixWeight[darkMind.y][darkMind.x].weight > precWeight) :
+							(matrixWeight[darkMind.y][darkMind.x].weight >= 0.8 && precWeight < 0.8)
+									|| (matrixWeight[darkMind.y][darkMind.x].weight >= 0.8 && matrixWeight[darkMind.y][darkMind.x].weight > precWeight))) {
+				precBugNumber = bugs.size();
+				precWeaponNumber = weapons.size();
+				precSnippetNumber = snippets.size();
+				weightChange = true;
+			} else weightChange = false;
+			precWeight = matrixWeight[darkMind.y][darkMind.x].weight;
 
 		} else if (type == "snippets") {
 			if (player_name == darkMind.name) {

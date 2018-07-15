@@ -179,16 +179,17 @@ public:
 		float sum2 = matrixWeight[so.y][so.x].weight;
 		if (sum1 == sum2) {
 			int nAdiacents2 = 0, nAdiacents1 = 0;
-			for (int i = 0; i < 4; i++) {
-				int myAdiacenty = this->y + dy[i], myAdiacentx = this->x + dx[i], soAdiaceny = so.y + dy[i], soAdiacentx = so.x + dx[i];
-				if (inMatrix(myAdiacenty, myAdiacentx)) sum1 += matrixWeight[myAdiacenty][myAdiacentx].weight;
-				if (inMatrix(soAdiaceny, soAdiacentx)) sum2 += matrixWeight[soAdiaceny][soAdiacentx].weight;
-				int nodeMyAd = pairToNode(myAdiacenty, myAdiacentx);
-				int nodeSoAd = pairToNode(soAdiaceny, soAdiacentx);
-				if (matrixAdiacents[node1][nodeMyAd]) nAdiacents1++;
-				if (matrixAdiacents[node1][nodeSoAd]) nAdiacents2++;
+			vector<int> myAd = getAdiacentsNode(node1);
+			vector<int> soAd = getAdiacentsNode(so.node);
+			for (int i = 0; i < myAd.size(); i++) {
+				int myAdiacenty = nodeToPair(myAd[i]).y, myAdiacentx = nodeToPair(myAd[i]).x;
+				sum1 += matrixWeight[myAdiacenty][myAdiacentx].weight;
 			}
-			return sum1 / nAdiacents1 <= sum2 / nAdiacents2;
+			for (int i = 0; i < myAd.size(); i++) {
+				int soAdy = nodeToPair(myAd[i]).y, soAdx = nodeToPair(myAd[i]).x;
+				sum2 += matrixWeight[soAdy][soAdx].weight;
+			}
+			return sum1 / myAd.size() <= sum2 / soAd.size();
 		}
 
 		return sum1 < sum2;
@@ -435,6 +436,7 @@ void weigths_cells() {
 				//if (r < bugRow &&inMatrix(r+1,c)&& !matrixAdiacents[pairToNode(r + 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
 				//if (c > bugRow &&inMatrix(r,c-1)&& !matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
 				//if (c > bugRow && inMatrix(r,c+1)&&!matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
+				if (cPeso < 0.5) cPeso = 0.0f;
 				if (matrixWeight[r][c].weight > cPeso) matrixWeight[r][c].weight += 0.1;
 				else if (matrixWeight[r][c].weight > 0.0) matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso + 0.1 : 0.0;
 				else matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso : 0.0;
@@ -451,6 +453,25 @@ void weigths_cells() {
 //      cerr << matrixWeight[r][c].weight << "-";
 //    cerr << endl;
 //    }}
+}
+bool inAdiacentDiAdiacent(int node) {
+	vector<int> ad = getAdiacentsNode(node);
+	for (int i = 0; i < ad.size(); i++) {
+		for (int bug = 0; bug < bugs.size(); bug++) {
+			if (bugs[bug].node == ad[i]) {
+				vector<int> ad2 = getAdiacentsNode(bugs[bug].node);
+				ad2.push_back(ad[i]);
+				for (int j = 0; j < ad2.size(); j++) {
+					for (int bug2 = 0; bug2 < bugs.size(); bug2++) {
+						if (bug != bug2 && bugs[bug2].node == ad2[j]) {
+							return true;
+						}
+					}
+				}
+			}
+		}
+	}
+	return false;
 }
 void process_next_command() {
 	string command;
@@ -523,7 +544,7 @@ void process_next_command() {
 			sort(snippets.begin(), snippets.end());
 			weigths_cells();
 			if (bugs.size() != precBugNumber || weapons.size() != precWeaponNumber || snippets.size() != precSnippetNumber || current_round < 2
-					|| (bugs.size() > 1 ?
+					|| (inAdiacentDiAdiacent(darkMind.node) ?
 							(matrixWeight[darkMind.y][darkMind.x].weight >= 0.9 && precWeight < 0.9)
 									|| (matrixWeight[darkMind.y][darkMind.x].weight >= 0.9 && matrixWeight[darkMind.y][darkMind.x].weight > precWeight) :
 							(matrixWeight[darkMind.y][darkMind.x].weight >= 0.8 && precWeight < 0.8)
@@ -598,13 +619,15 @@ Point dirToCell(string s) {
 
 }
 vector<SimpleObject> toScan;
+
 void do_move() {
 
 	cerr << "start turn: " << turn << endl;
 	cerr << "my pos:" << darkMind.node << "     enemy pos:" << enemy.node << endl;
 	int toPrint = -1;
 	//unsigned int min = width * height;
-	if (matrixWeight[darkMind.y][darkMind.x].weight >= 1.0) cout << getSafeDir() << endl;
+	if ((inAdiacentDiAdiacent(darkMind.node)) ? matrixWeight[darkMind.y][darkMind.x].weight >= 1.1 : matrixWeight[darkMind.y][darkMind.x].weight >= 1.0) cout << getSafeDir()
+			<< endl;
 	else {
 		if (weightChange) {
 			toScan = vector<SimpleObject>(snippets);

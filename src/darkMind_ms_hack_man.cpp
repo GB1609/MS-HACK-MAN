@@ -15,7 +15,7 @@ int width = -1;
 int height = -1;
 int numNodes = -1;
 int centerNode = -1;
-static int turn = 0;
+static int turn = 1;
 static int around = 3;
 int pairToNode(const int & r, const int & c) {
 	return r * width + c;
@@ -38,7 +38,6 @@ string getMoveGB(int begin, int move) {
 }
 bool weightChange = true;
 unsigned int precBugNumber = 0;
-unsigned int precWeaponNumber = 0;
 float precWeight = 0.0f;
 vector<int> pathFindGB(const int & posBegin, const int & posEnd);
 int numbersBonusNear(const int& node, const int& circle);
@@ -75,7 +74,6 @@ public:
 		return node;
 	}
 };
-
 class Point {
 public:
 	int x = -1;
@@ -203,7 +201,6 @@ public:
 	SimpleObject(int x, int y) :
 			Point(x, y) {
 	}
-
 	SimpleObject(int node) :
 			Point(node) {
 	}
@@ -238,6 +235,7 @@ public:
 			Point(node), rounds(-1) {
 	}
 };
+vector<ObjectWithRounds> precWeaponNumber;
 class Bug: public Point {
 public:
 	int type;
@@ -271,7 +269,7 @@ vector<ObjectWithRounds> weapons;
 vector<Bug> bugs;
 vector<ObjectWithRounds> spawn_points;
 vector<ObjectWithRounds> gates;
-bool checkListsChange() {
+bool checkChange() {
 	if (precSnippetNumber.size() != snippets.size()) return true;
 	for (unsigned int i = 0; i < snippets.size(); i++) {
 		int count = 0;
@@ -282,10 +280,52 @@ bool checkListsChange() {
 		}
 		if (count == 0) return true;
 	}
+
+	if (precWeaponNumber.size() != weapons.size()) return true;
+	for (unsigned int i = 0; i < weapons.size(); i++) {
+		int count = 0;
+		for (unsigned int j = 0; j < precWeaponNumber.size(); j++) {
+			if (weapons[i].node == precWeaponNumber[j].node) {
+				count++;
+			}
+		}
+		if (count == 0) return true;
+	}
 	return false;
 }
 void choose_character();
 void do_move();
+bool existWall(const int & r, const int & c, const int & bugR, const int & bugC) {
+	int a = bugR + 1;
+	if (a < height) {
+		while (a < r) {
+			if (!matrixAdiacents[pairToNode(a, bugC)][pairToNode(a - 1, bugC)]) return true;
+			a++;
+		}
+	}
+	a = bugR - 1;
+	if (a > 0) {
+		while (a > r) {
+			if (!matrixAdiacents[pairToNode(a, bugC)][pairToNode(a + 1, bugC)]) return true;
+			a--;
+		}
+	}
+	a = bugC + 1;
+	if (a < width) {
+		while (a < c) {
+			if (!matrixAdiacents[pairToNode(bugR, a)][pairToNode(bugR, a - 1)]) return true;
+			a++;
+		}
+	}
+	a = bugC - 1;
+	if (a > 0) {
+		while (a > c) {
+			if (!matrixAdiacents[pairToNode(bugR, a)][pairToNode(bugR, a + 1)]) return true;
+			a--;
+		}
+	}
+	return false;
+}
 bool isSetWalls = false;
 void initAdiacents() {
 	for (int r = 0; r < height; r++) {
@@ -359,9 +399,7 @@ void parseObjects(const string & objList, const int &cell) {
 					break;
 				case 'S': {
 					spawn_points.push_back(ObjectWithRounds(cell, stoi(objs[i].erase(0, 1))));
-					if (spawn_points.back().rounds == 1) {
-						bugs.push_back(std::move(Bug(spawn_points.back().node)));
-					}
+//					if (spawn_points.back() == 1) bugs.push_back(spawn_points.back().node);
 				}
 					break;
 				case 'G':
@@ -418,7 +456,6 @@ void weigths_cells() {
 
 					}
 				}
-
 				if (r == bugRow) {
 					if (c < bugCol) {
 						cPeso = 1.0 - ((bugCol - c - 1.0) / 10.0);
@@ -447,7 +484,7 @@ void weigths_cells() {
 				//if (r < bugRow &&inMatrix(r+1,c)&& !matrixAdiacents[pairToNode(r + 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
 				//if (c > bugRow &&inMatrix(r,c-1)&& !matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
 				//if (c > bugRow && inMatrix(r,c+1)&&!matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
-				if (cPeso < 0.5) cPeso = 0.0f;
+				if (cPeso < 0.6) cPeso = 0.0f;
 				if (matrixWeight[r][c].weight > cPeso) matrixWeight[r][c].weight += 0.1;
 				else if (matrixWeight[r][c].weight > 0.0) matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso + 0.1 : 0.0;
 				else matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso : 0.0;
@@ -549,24 +586,19 @@ void process_next_command() {
 				else if (fields[ce][0] == 'x') continue;
 				parseObjects(fields[ce], ce);
 			}
-			if (!isSetWalls) //todo delete if the gates modify their direction
-				addAdiacentsGates();
+			if (!isSetWalls) addAdiacentsGates();
 			isSetWalls = true;
 			sort(snippets.begin(), snippets.end());
 			weigths_cells();
-			if (bugs.size() != precBugNumber || weapons.size() != precWeaponNumber || checkListsChange() || current_round < 2
+			if (bugs.size() != precBugNumber || checkChange() || current_round < 2
 					|| (inAdiacentDiAdiacent(darkMind.node) ?
 							(matrixWeight[darkMind.y][darkMind.x].weight >= 0.9 && precWeight < 0.9)
 									|| (matrixWeight[darkMind.y][darkMind.x].weight >= 0.9 && matrixWeight[darkMind.y][darkMind.x].weight > precWeight) :
 							(matrixWeight[darkMind.y][darkMind.x].weight >= 0.8 && precWeight < 0.8)
 									|| (matrixWeight[darkMind.y][darkMind.x].weight >= 0.8 && matrixWeight[darkMind.y][darkMind.x].weight > precWeight))) {
 				precBugNumber = bugs.size();
-				precWeaponNumber = weapons.size();
 				weightChange = true;
 			} else weightChange = false;
-			precWeight = matrixWeight[darkMind.y][darkMind.x].weight;
-			precSnippetNumber = snippets;
-
 		} else if (type == "snippets") {
 			if (player_name == darkMind.name) {
 				cin >> darkMind.snippets;
@@ -618,9 +650,10 @@ string getSafeDir() {
 	sort(adiacents.begin(), adiacents.end());
 	int toR = 0;
 	if (adiacents[0].weight == adiacents[1].weight || abs(adiacents[0].weight - adiacents[1].weight) == 0.1) {
-		float min = 0;
+		float min = INT_MAX;
 		for (unsigned int a = 0; a < gates.size(); a++) {
-			float e0 = euclidianDistanceNode(adiacents[0].node, gates[a].node), e1 = euclidianDistanceNode(adiacents[1].node, gates[a].node);
+			float e0 = euclidianDistanceNode(adiacents[0].node, gates[a].node);
+			float e1 = euclidianDistanceNode(adiacents[1].node, gates[a].node);
 			if (e0 < e1 && e0 < min) toR = 0;
 			if (e1 < e0 && e1 < min) toR = 1;
 		}
@@ -636,16 +669,16 @@ Point dirToCell(string s) {
 	if (s == "down") return std::move(Point(darkMind.x, darkMind.y + 1));
 	return std::move(Point(darkMind.x, darkMind.y));
 }
-bool toRight(const int &node1, const int& node2) {
+bool isOnRight(const int &node1, const int& node2) {
 	return node1 == node2 - 1 || node1 == node2 - (width - 1);
 }
-bool toLeft(const int &node1, const int& node2) {
+bool isOnLeft(const int &node1, const int& node2) {
 	return node1 == node2 + 1 || node1 == node2 + (width - 1);
 }
-bool toUp(const int &node1, const int& node2) {
+bool isOnUp(const int &node1, const int& node2) {
 	return node1 == node2 + width;
 }
-bool toDown(const int &node1, const int& node2) {
+bool isOnDown(const int &node1, const int& node2) {
 	return node1 == node2 - width;
 }
 int weightToLeft(const int &node1) {
@@ -670,16 +703,15 @@ int weightToDown(const int &node1) {
 	int y = nodeToPair(node1).y + 1;
 	return matrixWeight[y][x].weight;
 }
-int getWeight(const int& node) {
+float getWeight(const int& node) {
 	return matrixWeight[nodeToPair(node).y][nodeToPair(node).x].weight;
 }
 bool sureToGo(const int& toGo, const int& dm) {
 	float weightToGo = getWeight(toGo);
 	float weightDM = getWeight(dm);
+	if (bugs.empty()) return true;
 	if (weightToGo <= 0.70 || weightDM >= weightToGo) return true;
-	for (unsigned int i = 0; i < bugs.size(); i++)
-		if (euclidianDistanceNode(bugs[i].node, toGo) < 2.4) return false;
-	return true;
+	return false;
 }
 map<ObjectWithRounds, vector<int> > checkDangerNode();
 vector<int> getDangerNodes(ObjectWithRounds bomb);
@@ -687,9 +719,11 @@ vector<SimpleObject> toScan;
 void do_move() {
 	cerr << "start turn: " << turn << endl;
 	cerr << "my pos:" << darkMind.node << "     enemy pos:" << enemy.node << endl;
-	int toPrint = -1;
-//	unsigned int min = INT_MAX;
-	if ((inAdiacentDiAdiacent(darkMind.node)) ? getWeight(darkMind.node) >= 1.1 : getWeight(darkMind.node) >= 1.0) cout << getSafeDir() << endl;
+	int toPrint = -1, toPrintEN = -1, toGO, aroundV;
+	unsigned int min = INT_MAX, minEN = INT_MAX, pathChoicher, sizeEN;
+	float eN, eDM;
+//	if ((inAdiacentDiAdiacent(darkMind.node)) ? getWeight(darkMind.node) >= 0.0 : getWeight(darkMind.node) >= 0.8) cout << getSafeDir() << endl;
+	if (getWeight(darkMind.node) >= 0.8) cout << getSafeDir() << endl;
 	else {
 		if (weightChange) {
 			toScan = vector<SimpleObject>(snippets);
@@ -703,15 +737,22 @@ void do_move() {
 			cerr << "path to " << toScan[i].node << ": ";
 			for (unsigned int a = 0; a < temp.size(); a++)
 				cerr << temp[a] << ",";
-			cerr << endl;
+			cerr << "with length " << temp.size();
 			vector<int> tempEn = pathFindGB(enemy.node, toScan[i].node);
-			int toGO = temp[temp.size() - 1];
-			int aroundV = numbersBonusNear(toGO, around);
-			unsigned int pathChoicher = temp.size() - aroundV;
-			if (temp.size() > 0 && tempEn.size() >= pathChoicher /*&& pathChoicher < min */&& sureToGo(toGO, darkMind.node)) {
+			if (tempEn.size() < minEN || minEN == INT_MAX) {
+				minEN = tempEn.size();
+				toPrintEN = temp[tempEn.size() - 1];
+			}
+			toGO = temp[temp.size() - 1];
+			aroundV = numbersBonusNear(toGO, around) - 1;
+			pathChoicher = temp.size() - aroundV;
+			cerr << " updated to " << temp.size() << endl;
+			sizeEN = tempEn.size();
+			eN = euclidianDistanceNode(toPrintEN, toScan[i].node);
+			eDM = euclidianDistanceNode(toGO, toScan[i].node);
+			if (temp.size() > 0 && (sizeEN >= temp.size() || eN > eDM) && pathChoicher < min) {
 				toPrint = toGO;
-				break;
-//				min = pathChoicher;
+				min = pathChoicher;
 			}
 		}
 		cerr << "CHOICHE: ";

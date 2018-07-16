@@ -15,7 +15,7 @@ int width = -1;
 int height = -1;
 int numNodes = -1;
 int centerNode = -1;
-static int turn = 0;
+static int turn = 1;
 static int around = 3;
 int pairToNode(const int & r, const int & c) {
 	return r * width + c;
@@ -295,6 +295,37 @@ bool checkChange() {
 }
 void choose_character();
 void do_move();
+bool existWall(const int & r, const int & c, const int & bugR, const int & bugC) {
+	int a = bugR + 1;
+	if (a < height) {
+		while (a < r) {
+			if (!matrixAdiacents[pairToNode(a, bugC)][pairToNode(a - 1, bugC)]) return true;
+			a++;
+		}
+	}
+	a = bugR - 1;
+	if (a > 0) {
+		while (a > r) {
+			if (!matrixAdiacents[pairToNode(a, bugC)][pairToNode(a + 1, bugC)]) return true;
+			a--;
+		}
+	}
+	a = bugC + 1;
+	if (a < width) {
+		while (a < c) {
+			if (!matrixAdiacents[pairToNode(bugR, a)][pairToNode(bugR, a - 1)]) return true;
+			a++;
+		}
+	}
+	a = bugC - 1;
+	if (a > 0) {
+		while (a > c) {
+			if (!matrixAdiacents[pairToNode(bugR, a)][pairToNode(bugR, a + 1)]) return true;
+			a--;
+		}
+	}
+	return false;
+}
 bool isSetWalls = false;
 void initAdiacents() {
 	for (int r = 0; r < height; r++) {
@@ -368,7 +399,7 @@ void parseObjects(const string & objList, const int &cell) {
 					break;
 				case 'S': {
 					spawn_points.push_back(ObjectWithRounds(cell, stoi(objs[i].erase(0, 1))));
-					if (spawn_points.back() == 1) bugs.push_back(spawn_points.back().node);
+//					if (spawn_points.back() == 1) bugs.push_back(spawn_points.back().node);
 				}
 					break;
 				case 'G':
@@ -453,7 +484,7 @@ void weigths_cells() {
 				//if (r < bugRow &&inMatrix(r+1,c)&& !matrixAdiacents[pairToNode(r + 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
 				//if (c > bugRow &&inMatrix(r,c-1)&& !matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
 				//if (c > bugRow && inMatrix(r,c+1)&&!matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
-				if (cPeso < 0.5) cPeso = 0.0f;
+				if (cPeso < 0.6) cPeso = 0.0f;
 				if (matrixWeight[r][c].weight > cPeso) matrixWeight[r][c].weight += 0.1;
 				else if (matrixWeight[r][c].weight > 0.0) matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso + 0.1 : 0.0;
 				else matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso : 0.0;
@@ -672,7 +703,7 @@ int weightToDown(const int &node1) {
 	int y = nodeToPair(node1).y + 1;
 	return matrixWeight[y][x].weight;
 }
-int getWeight(const int& node) {
+float getWeight(const int& node) {
 	return matrixWeight[nodeToPair(node).y][nodeToPair(node).x].weight;
 }
 bool sureToGo(const int& toGo, const int& dm) {
@@ -680,7 +711,7 @@ bool sureToGo(const int& toGo, const int& dm) {
 	float weightDM = getWeight(dm);
 	if (bugs.empty()) return true;
 	if (weightToGo <= 0.70 || weightDM >= weightToGo) return true;
-	return true;
+	return false;
 }
 map<ObjectWithRounds, vector<int> > checkDangerNode();
 vector<int> getDangerNodes(ObjectWithRounds bomb);
@@ -692,48 +723,48 @@ void do_move() {
 	unsigned int min = INT_MAX, minEN = INT_MAX, pathChoicher, sizeEN;
 	float eN, eDM;
 //	if ((inAdiacentDiAdiacent(darkMind.node)) ? getWeight(darkMind.node) >= 0.0 : getWeight(darkMind.node) >= 0.8) cout << getSafeDir() << endl;
-//	if (getWeight(darkMind.node) >= 0.8) cout << getSafeDir() << endl;
-//	else {
-	if (weightChange) {
-		toScan = vector<SimpleObject>(snippets);
-		for (unsigned int a = 0; a < weapons.size(); a++) {
-			if (weapons[a].rounds == -1) toScan.push_back(SimpleObject(weapons[a].node));
+	if (getWeight(darkMind.node) >= 0.8) cout << getSafeDir() << endl;
+	else {
+		if (weightChange) {
+			toScan = vector<SimpleObject>(snippets);
+			for (unsigned int a = 0; a < weapons.size(); a++) {
+				if (weapons[a].rounds == -1) toScan.push_back(SimpleObject(weapons[a].node));
+			}
+			sort(toScan.begin(), toScan.end());
 		}
-		sort(toScan.begin(), toScan.end());
-	}
-	for (unsigned int i = 0; i < toScan.size(); i++) {
-		vector<int> temp = pathFindGB(darkMind.node, toScan[i].node);
-		cerr << "path to " << toScan[i].node << ": ";
-		for (unsigned int a = 0; a < temp.size(); a++)
-			cerr << temp[a] << ",";
-		cerr << "with length " << temp.size();
-		vector<int> tempEn = pathFindGB(enemy.node, toScan[i].node);
-		if (tempEn.size() < minEN || minEN == INT_MAX) {
-			minEN = tempEn.size();
-			toPrintEN = temp[tempEn.size() - 1];
+		for (unsigned int i = 0; i < toScan.size(); i++) {
+			vector<int> temp = pathFindGB(darkMind.node, toScan[i].node);
+			cerr << "path to " << toScan[i].node << ": ";
+			for (unsigned int a = 0; a < temp.size(); a++)
+				cerr << temp[a] << ",";
+			cerr << "with length " << temp.size();
+			vector<int> tempEn = pathFindGB(enemy.node, toScan[i].node);
+			if (tempEn.size() < minEN || minEN == INT_MAX) {
+				minEN = tempEn.size();
+				toPrintEN = temp[tempEn.size() - 1];
+			}
+			toGO = temp[temp.size() - 1];
+			aroundV = numbersBonusNear(toGO, around) - 1;
+			pathChoicher = temp.size() - aroundV;
+			cerr << " updated to " << temp.size() << endl;
+			sizeEN = tempEn.size();
+			eN = euclidianDistanceNode(toPrintEN, toScan[i].node);
+			eDM = euclidianDistanceNode(toGO, toScan[i].node);
+			if (temp.size() > 0 && (sizeEN >= temp.size() || eN > eDM) && pathChoicher < min) {
+				toPrint = toGO;
+				min = pathChoicher;
+			}
 		}
-		toGO = temp[temp.size() - 1];
-		aroundV = numbersBonusNear(toGO, around) - 1;
-		pathChoicher = temp.size() - aroundV;
-		cerr << " updated to " << temp.size() << endl;
-		sizeEN = tempEn.size();
-		eN = euclidianDistanceNode(toPrintEN, toScan[i].node);
-		eDM = euclidianDistanceNode(toGO, toScan[i].node);
-		if (temp.size() > 0 && (sizeEN >= temp.size() || eN > eDM) && pathChoicher < min && sureToGo(toGO,darkMind.node)) {
-			toPrint = toGO;
-			min = pathChoicher;
+		cerr << "CHOICHE: ";
+		if (toPrint == -1) {
+			vector<int> toCe = pathFindGB(darkMind.node, centerNode);
+			(toCe.size() > 0) ? cout << getMoveGB(darkMind.node, toCe[toCe.size() - 1]) << endl : cout << getSafeDir() << endl;
+			cerr << "GO TO CENTER or PASS" << endl;
+		} else {
+			cout << getMoveGB(darkMind.node, toPrint) << endl;
+			cerr << "GO TO " << toPrint << endl;
 		}
 	}
-	cerr << "CHOICHE: ";
-	if (toPrint == -1) {
-		vector<int> toCe = pathFindGB(darkMind.node, centerNode);
-		(toCe.size() > 0) ? cout << getMoveGB(darkMind.node, toCe[toCe.size() - 1]) << endl : cout << getSafeDir() << endl;
-		cerr << "GO TO CENTER or PASS" << endl;
-	} else {
-		cout << getMoveGB(darkMind.node, toPrint) << endl;
-		cerr << "GO TO " << toPrint << endl;
-	}
-//	}
 	cerr << "END TURN: " << turn << endl;
 	turn++;
 }

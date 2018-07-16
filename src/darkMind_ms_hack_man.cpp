@@ -37,8 +37,7 @@ string getMoveGB(int begin, int move) {
 }
 bool weightChange = true;
 unsigned int precBugNumber = 0;
-unsigned int precWeaponNumber = 0;
-unsigned int precSnippetNumber = 0;
+
 float precWeight = 0.0f;
 vector<int> pathFindGB(const int & posBegin, const int & posEnd);
 class NodeGB {
@@ -225,6 +224,9 @@ public:
 		return sum2 < sum1;
 	}
 };
+//TODO è DIVENTATO UN VECTOR
+vector<SimpleObject> precSnippetNumber;
+
 class ObjectWithRounds: public Point {
 public:
 	int rounds;
@@ -253,7 +255,7 @@ public:
 
 	}
 };
-
+vector<ObjectWithRounds> precWeaponNumber;
 //class Cell: public Point{
 template<char delimiter>
 class StringDelimitedBy: public string {
@@ -274,7 +276,32 @@ vector<ObjectWithRounds> weapons;
 vector<Bug> bugs;
 vector<ObjectWithRounds> spawn_points;
 vector<ObjectWithRounds> gates;
+//TODO INCOLLA QUESTA FUNZIONE
 
+bool checkChange() {
+	if (precSnippetNumber.size() != snippets.size()) return true;
+	for (unsigned int i = 0; i < snippets.size(); i++) {
+		int count = 0;
+		for (unsigned int j = 0; j < precSnippetNumber.size(); j++) {
+			if (snippets[i].node == precSnippetNumber[j].node) {
+				count++;
+			}
+		}
+		if (count == 0) return true;
+	}
+
+	if (precWeaponNumber.size() != weapons.size()) return true;
+	for (unsigned int i = 0; i < weapons.size(); i++) {
+		int count = 0;
+		for (unsigned int j = 0; j < precWeaponNumber.size(); j++) {
+			if (weapons[i].node == precWeaponNumber[j].node) {
+				count++;
+			}
+		}
+		if (count == 0) return true;
+	}
+	return false;
+}
 void choose_character();
 void do_move();
 
@@ -456,13 +483,13 @@ void weigths_cells() {
 }
 bool inAdiacentDiAdiacent(int node) {
 	vector<int> ad = getAdiacentsNode(node);
-	for (int i = 0; i < ad.size(); i++) {
-		for (int bug = 0; bug < bugs.size(); bug++) {
+	for (unsigned int i = 0; i < ad.size(); i++) {
+		for (unsigned int bug = 0; bug < bugs.size(); bug++) {
 			if (bugs[bug].node == ad[i]) {
 				vector<int> ad2 = getAdiacentsNode(bugs[bug].node);
 				ad2.push_back(ad[i]);
-				for (int j = 0; j < ad2.size(); j++) {
-					for (int bug2 = 0; bug2 < bugs.size(); bug2++) {
+				for (unsigned int j = 0; j < ad2.size(); j++) {
+					for (unsigned int bug2 = 0; bug2 < bugs.size(); bug2++) {
 						if (bug != bug2 && bugs[bug2].node == ad2[j]) {
 							return true;
 						}
@@ -543,19 +570,20 @@ void process_next_command() {
 			isSetWalls = true;
 			sort(snippets.begin(), snippets.end());
 			weigths_cells();
-			if (bugs.size() != precBugNumber || weapons.size() != precWeaponNumber || snippets.size() != precSnippetNumber || current_round < 2
+			//todo sostituire da qui
+			if (bugs.size() != precBugNumber || checkChange() || current_round < 2
 					|| (inAdiacentDiAdiacent(darkMind.node) ?
 							(matrixWeight[darkMind.y][darkMind.x].weight >= 0.9 && precWeight < 0.9)
 									|| (matrixWeight[darkMind.y][darkMind.x].weight >= 0.9 && matrixWeight[darkMind.y][darkMind.x].weight > precWeight) :
 							(matrixWeight[darkMind.y][darkMind.x].weight >= 0.8 && precWeight < 0.8)
 									|| (matrixWeight[darkMind.y][darkMind.x].weight >= 0.8 && matrixWeight[darkMind.y][darkMind.x].weight > precWeight))) {
 				precBugNumber = bugs.size();
-				precWeaponNumber = weapons.size();
-				precSnippetNumber = snippets.size();
 				weightChange = true;
 			} else weightChange = false;
 			precWeight = matrixWeight[darkMind.y][darkMind.x].weight;
-
+			precSnippetNumber = snippets;
+			precWeaponNumber = weapons;
+			////////////////////////////////////////FINO A QUI//////////////////////////////////////////////////////////
 		} else if (type == "snippets") {
 			if (player_name == darkMind.name) {
 				cin >> darkMind.snippets;

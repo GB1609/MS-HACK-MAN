@@ -15,7 +15,7 @@ int width = -1;
 int height = -1;
 int numNodes = -1;
 int centerNode = -1;
-static int turn = 1;
+static int turn = 0;
 static int around = 3;
 int pairToNode(const int & r, const int & c) {
 	return r * width + c;

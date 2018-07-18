@@ -101,7 +101,7 @@ public:
 		return *this;
 	}
 };
-vector<int> getAdiacentsNode(const int& node);
+vector<int> getAdiacentsNode(const int& node, const bool & isForBug);
 ///////// let a node returns its coordinates
 Point nodeToPair(const int & node) {
 	int r = node / width;
@@ -432,7 +432,7 @@ bool inMatrixNode(const int& node) {
 	return (node >= 0 && node < numNodes);
 }
 bool notInAdiacents(const int& node, const int& toVer) {
-	vector<int> ad = getAdiacentsNode(node);
+	vector<int> ad = getAdiacentsNode(node, false);
 	for (unsigned int a = 0; a < ad.size(); a++)
 		if (ad[a] == toVer) return true;
 	return false;
@@ -454,121 +454,58 @@ bool thereIsBugNear(const int& node) {
 	return toReturn > 1;
 }
 vector<NodeGB> bugsPaths;
+vector<Point> objBugs;
+int currentBug = 0;
 void weigths_cells() {
 	// 0-> rosso
 	// 1->verde
 	//2 ->giallo
 	//3 ->viola
 	bugsPaths.clear();
-	vector<Point> objBugs;
-	cerr << "1" << endl;
-	for (int i = 0; i < bugs.size(); i++) {
+	objBugs.clear();
+	for (unsigned int i = 0; i < bugs.size(); i++) {
 		switch (bugs[i].type) {
 		case 0:
-			cerr << "2" << endl;
-
 			objBugs.push_back(getObjectiveRedBugsTL(bugs[i].node));
-			cerr << "3" << endl;
-
+			currentBug = i;
 			bugsPaths.push_back(std::move(pathFindGB(bugs[i].node, objBugs[i].node, true)));
-			cerr << "4" << endl;
-
 			break;
 		case 1:
 			objBugs.push_back(getObjectiveGreenBugsTR(bugs[i].node));
+			currentBug = i;
 			bugsPaths.push_back(std::move(pathFindGB(bugs[i].node, objBugs[i].node, true)));
-
 			break;
 		case 2:
 			objBugs.push_back(getObjectiveYellowBugsBR(bugs[i].node));
+			currentBug = i;
 			bugsPaths.push_back(std::move(pathFindGB(bugs[i].node, objBugs[i].node, true)));
 
 			break;
 		case 3:
 			objBugs.push_back(getObjectiveBlueBugsBL(bugs[i].node));
+			currentBug = i;
 			bugsPaths.push_back(std::move(pathFindGB(bugs[i].node, objBugs[i].node, true)));
 			break;
 		default:
 			break;
 		}
 	}
-	cerr << "5" << endl;
-
-	for (int r = 0; r < height; r++) //{
-		for (int c = 0; c < width; c++) //{
+	for (int r = 0; r < height; r++)
+		for (int c = 0; c < width; c++)
 			matrixWeight[r][c].weight = 0.0f;
-//			for (unsigned int bug = 0; bug < bugs.size(); bug++) {
-//				int bugCol = bugs[bug].x;
-//				int bugRow = bugs[bug].y;
-//				string dirBug = getMoveGB(bugs[bug].node, bugsPaths[bug].discendenza[1]);
-//				float cPeso = 0.0;
-//				if (r < bugRow) {
-//					float rPeso = 1.0 - ((bugRow - r - 1.0) / 10.0);
-//					if (c <= bugCol) {
-//						cPeso = rPeso - ((bugCol - c) / 10.0);
-//					} else {
-//						cPeso = rPeso - ((c - bugCol) / 10.0);
-//
-//					}
-//				}
-//				if (r == bugRow) {
-//					if (c < bugCol) {
-//						cPeso = 1.0 - ((bugCol - c - 1.0) / 10.0);
-//					} else {
-//						if (c == bugCol) {
-//							if (matrixWeight[r][c].weight > 0.0) matrixWeight[r][c].weight = 1.5 + 0.1;
-//							else matrixWeight[r][c].weight = 1.5;
-//							continue;
-//						} else {
-//							cPeso = 1.0 - ((c - bugCol - 1.0) / 10.0);
-//						}
-//					}
-//				}
-//
-//				if (r > bugRow) {
-//					float rPeso = 1.0 - ((r - bugRow - 1.0) / 10.0);
-//					if (c <= bugCol) {
-//						cPeso = rPeso - ((bugCol - c) / 10.0);
-//					} else {
-//						cPeso = rPeso - ((c - bugCol) / 10.0);
-//
-//					}
-//				}
-//				if ((dirBug == "up" && r > bugRow + 1) || (dirBug == "down" && r < bugRow - 1) || (dirBug == "left" && c > bugCol + 1) || (dirBug == "right" && c < bugCol - 1))
-//					cPeso = 0.0f;
-//				//if (r > bugRow &&inMatrix(r-1,c)&& !matrixAdiacents[pairToNode(r - 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
-//				//if (r < bugRow &&inMatrix(r+1,c)&& !matrixAdiacents[pairToNode(r + 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
-//				//if (c > bugRow &&inMatrix(r,c-1)&& !matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
-//				//if (c > bugRow && inMatrix(r,c+1)&&!matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
-//				if (cPeso < 0.7) cPeso = 0.0f;
-//				if (matrixWeight[r][c].weight > cPeso) {
-//				}				//do nothing{}
-//				else if (matrixWeight[r][c].weight > 0.0) matrixWeight[r][c].weight = cPeso;
-//				else matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso : 0.0;
-//			}
-//		}
-//	}
-	cerr << "qui ci arrivo " << endl;
 	for (unsigned int i = 0; i < bugs.size(); i++) {
 		cerr << "bug " << i << " type " << bugs[i].type << " [ " << bugs[i].node << "] to obj" << objBugs[i].node;
 		vector<int> & path = bugsPaths[i].discendenza;
-//		if (path.size() > 1) {
 			string dirBug = getMoveGB(bugs[i].node, path[1]);
 			cerr << dirBug << endl;
 		for (unsigned int node = 0; node < path.size(); node++) {
 				Point p(nodeToPair(path[node]));
 				if (node == 0) {
-				cerr << "lkk" << p.y << "----" << p.x << endl;
-					matrixWeight[p.y][p.x].weight = 1.5f;
-				//					if (dirBug == "up" && inMatrix(p.y - 1, p.x)) {
-				//						if (matrixWeight[p.y - 1][p.x].weight < 1.0) matrixWeight[p.y - 1][p.x].weight = 1.0f;
-				//					} else if (dirBug == "down" && inMatrix(p.y + 1, p.x)) {
-				//					if (matrixWeight[p.y + 1][p.x].weight < 1.0) matrixWeight[p.y + 1][p.x].weight = 1.0f;
-				//					} else if (dirBug == "left" && inMatrix(p.y, p.x + 1)) {
-				//						if (matrixWeight[p.y][p.x + 1].weight < 1.0) matrixWeight[p.y][p.x + 1].weight = 1.0f;
-				//					} else if (inMatrix(p.y, p.x - 1)) {
-				//						if (matrixWeight[p.y][p.x - 1].weight < 1.0) matrixWeight[p.y][p.x - 1].weight = 1.0f;
-				//					}
+				cerr << "path to " << objBugs[i].node << ": ";
+				for (unsigned int a = 0; a < path.size(); a++)
+					cerr << path[a] << ",";
+				cerr << endl;
+				matrixWeight[p.y][p.x].weight = 1.5f;
 				} else {
 					cerr << "node" << node << "=" << (1.0f - ((node - 1.0f) / 10.0)) << endl;
 					float weight = 1.0f - ((node - 1.0f) / 10.0);
@@ -577,33 +514,7 @@ void weigths_cells() {
 
 				}
 			}
-//		}
 	}
-
-
-
-
-//	for (int i = 0; i < numNodes; i++) {
-//		int y = nodeToPair(i).y;
-//		int x = nodeToPair(i).x;
-//		if (matrixWall[y][x]) matrixWeight[y][x].weight = 0.0f;
-//		if (inMatrixNode(i - 1) && matrixWall[y][x - 1] && inMatrixNode(i - 2) && getWeight(i) > getWeight(i - 2)) {
-//			if (!thereIsBugNear(i - 2)) matrixWeight[y][x - 2].weight = 0.0f;
-//			else matrixWeight[y][x - 2].weight -= 0.1;
-//		}
-//		if (inMatrixNode(i + 1) && matrixWall[y][x + 1] && inMatrixNode(i + 2) && getWeight(i) > getWeight(i + 2)) {
-//			if (!thereIsBugNear(i + 2)) matrixWeight[y][x + 2].weight = 0.0f;
-//			else matrixWeight[y][x + 2].weight -= 0.1;
-//		}
-//		if (inMatrixNode(i + width) && matrixWall[y + 1][x] && inMatrixNode(i + width * 2) && getWeight(i) > getWeight(i + width * 2)) {
-//			if (!thereIsBugNear(i + width * 2)) matrixWeight[y + 2][x].weight = 0.0f;
-//			else matrixWeight[y + 2][x].weight -= 0.1f;
-//		}
-//		if (inMatrixNode(i - width) && matrixWall[y - 1][x] && inMatrixNode(i - width * 2) && getWeight(i) > getWeight(i - width * 2)) {
-//			if (!thereIsBugNear(i - width * 2)) matrixWeight[y - 2][x].weight = 0.0f;
-//			else matrixWeight[y - 2][x].weight -= 0.1f;
-//		}
-//	}
 	if (bugs.size() != 0) {
 		cerr << turn << endl;
 		for (unsigned int i = 0; i < bugs.size(); i++)
@@ -617,11 +528,11 @@ void weigths_cells() {
 	}
 }
 bool inAdiacentDiAdiacent(int node) {
-	vector<int> ad = getAdiacentsNode(node);
+	vector<int> ad = getAdiacentsNode(node, false);
 	for (unsigned int i = 0; i < ad.size(); i++) {
 		for (unsigned int bug = 0; bug < bugs.size(); bug++) {
 			if (bugs[bug].node == ad[i]) {
-				vector<int> ad2 = getAdiacentsNode(bugs[bug].node);
+				vector<int> ad2 = getAdiacentsNode(bugs[bug].node, false);
 				ad2.push_back(ad[i]);
 				for (unsigned int j = 0; j < ad2.size(); j++) {
 					for (unsigned int bug2 = 0; bug2 < bugs.size(); bug2++) {
@@ -845,7 +756,7 @@ string getSafeDir() {
 		} else if (inMatrixNode(u1) && matrixAdiacents[dm][u1] && (!matrixAdiacents[dm][l1] || !inMatrixNode(l1))) return "up";
 		else if ((!inMatrixNode(u1) || !matrixAdiacents[dm][u1]) && inMatrixNode(l1) && matrixAdiacents[dm][l1]) return "left";
 	}
-	vector<int> nodes = getAdiacentsNode(darkMind.node);
+	vector<int> nodes = getAdiacentsNode(darkMind.node, false);
 	vector<Cell> adiacents;
 	for (unsigned int i = 0; i < nodes.size(); i++)
 		adiacents.push_back(matrixWeight[nodeToPair(nodes[i]).y][nodeToPair(nodes[i]).x]);
@@ -1030,24 +941,59 @@ int getObjectiveRedBugsTL(const int & posBegin) {
 	if (closestPlayer == darkMind.id) return darkMind.node;
 	else return enemy.node;
 }
+int getAdiacentsWithMinimuED(const int& posBegin, const int & posEnd) {
+	Point p(posEnd);
+	float eDistance = euclidianDistanceNode(posBegin, posEnd);
+	int toReturn = 0;
+	float minDifference = INTMAX_MAX;
+	for (int i = 0; i < 4; i++) {
+		if (inMatrix(p.y + dy[i], p.x + dx[i]) && !matrixWall[p.y + dy[i]][p.x + dx[i]]) {
+			float minDiff;
+			if ((minDiff = abs((eDistance - euclidianDistanceNode(posBegin, pairToNode(p.y + dy[i], p.x + dx[i]))))) < minDifference) {
+				minDifference = minDiff;
+				toReturn = i;
+			}
+		}
+	}
+	return pairToNode(p.y + dy[toReturn], p.x + dx[toReturn]);
+
+}
 int getObjectiveGreenBugsTR(const int & posBegin) {
 	int closestPlayer = getClosestPlayer(posBegin);
 	Player p = (closestPlayer == darkMind.id) ? darkMind : enemy;
+	Point b(posBegin);
 	if (p.direction == "up") {
+
 		int xNew = p.y - 4;
 		if (xNew < 0) xNew = 0;
+		if (b.x == p.x && b.y + 1 == p.y - 1) {
+				xNew = b.y + 1;
+			}
+		if (xNew > height - 1) xNew = height - 1;
 		return pairToNode(xNew, p.x);
 	} else if (p.direction == "down") {
 		int xNew = p.y + 4;
 		if (xNew > height - 1) xNew = height - 1;
+		if (b.x == p.x && b.y - 1 == p.y + 1) {
+			xNew = b.y - 1;
+		}
+		if (xNew < 0) xNew = 0;
 		return pairToNode(xNew, p.x);
 	} else if (p.direction == "left") {
 		int yNew = p.x - 4;
 		if (yNew < 0) yNew = 0;
+		if (b.y == p.y && b.x + 1 == p.x - 1) {
+			yNew = b.x + 1;
+		}
+		if (yNew > width) yNew = width - 1;
 		return pairToNode(p.y, yNew);
 	} else if (p.direction == "right") {
 		int yNew = p.x + 4;
 		if (yNew > width - 1) yNew = width - 1;
+		if (b.y == p.y && b.x - 1 == p.x + 1) {
+			yNew = b.x - 1;
+		}
+		if (yNew < 0) yNew = 0;
 		return pairToNode(p.y, yNew);
 	}
 	return 0;
@@ -1122,14 +1068,16 @@ vector<int> getDangerNodes(ObjectWithRounds bomb) {
 	}
 	return nodes;
 }
-vector<int> getAdiacentsNode(const int& node) {
+vector<int> getAdiacentsNode(const int& node, const bool & isforBug) {
 	vector<int> toReturn;
-	if (node - width >= 0 && matrixAdiacents[node][node - width]) toReturn.push_back(node - width);
-	if (node + width < numNodes && matrixAdiacents[node][node + width]) toReturn.push_back(node + width);
-	if (node + 1 < numNodes && matrixAdiacents[node][node + 1]) toReturn.push_back(node + 1);
-	if (node - 1 >= 0 && matrixAdiacents[node][node - 1]) toReturn.push_back(node - 1);
+	if (node - width >= 0 && (matrixAdiacents[node][node - width] || (isforBug && node - width == objBugs[currentBug].node))) toReturn.push_back(node - width);
+	if (node + width < numNodes && (matrixAdiacents[node][node + width] || (isforBug && node + width == objBugs[currentBug].node))) toReturn.push_back(node + width);
+	if (node + 1 < numNodes && (matrixAdiacents[node][node + 1] || (isforBug && node + 1 == objBugs[currentBug].node))) toReturn.push_back(node + 1);
+	if (node - 1 >= 0 && (matrixAdiacents[node][node - 1] || (isforBug && node - 1 == objBugs[currentBug].node))) toReturn.push_back(node - 1);
+	if (!isforBug) {
 	if (node == gates[0].node) toReturn.push_back(gates[1].node);
-	if (node == gates[1].node) toReturn.push_back(gates[0].node);
+		if (node == gates[1].node) toReturn.push_back(gates[0].node);
+	}
 	return toReturn;
 }
 int numbersBonusNear(const int& node, const int& circle) {
@@ -1169,7 +1117,7 @@ NodeGB pathFindGB(const int & posBegin, const int & posEnd, bool isForBug) {
 			}
 		}
 		queue.pop();
-		vector<int> ad = getAdiacentsNode(s.node);
+		vector<int> ad = getAdiacentsNode(s.node, isForBug);
 		for (unsigned int i = 0; i < ad.size(); i++) {
 			if (!visited[ad[i]]) {
 				visited[ad[i]] = true;

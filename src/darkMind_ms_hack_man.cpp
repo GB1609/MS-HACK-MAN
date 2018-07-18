@@ -45,6 +45,8 @@ public:
 	int node;
 	vector<int> discendenza;
 	float cost;
+	NodeGB() {
+	} //serve ad elena
 	NodeGB(int n, int c, vector<int> f) {
 		node = n;
 		cost = c;
@@ -456,24 +458,32 @@ bool thereIsBugNear(const int& node) {
 vector<NodeGB> bugsPaths;
 vector<Point> objBugs;
 int currentBug = 0;
+vector<int> pathForBug(const int & b, const int & e);
 void weigths_cells() {
 	// 0-> rosso
 	// 1->verde
 	//2 ->giallo
 	//3 ->viola
+//	cerr << "1" << endl;
 	bugsPaths.clear();
 	objBugs.clear();
 	for (unsigned int i = 0; i < bugs.size(); i++) {
 		switch (bugs[i].type) {
 		case 0:
+
 			objBugs.push_back(getObjectiveRedBugsTL(bugs[i].node));
+//			cerr << "2" << endl;
 			currentBug = i;
 			bugsPaths.push_back(std::move(pathFindGB(bugs[i].node, objBugs[i].node, true)));
+//			cerr << "3" << endl;
 			break;
-		case 1:
+		case 1: {
 			objBugs.push_back(getObjectiveGreenBugsTR(bugs[i].node));
+//			cerr << "4" << endl;
 			currentBug = i;
 			bugsPaths.push_back(std::move(pathFindGB(bugs[i].node, objBugs[i].node, true)));
+//			cerr << "7" << endl;
+		}
 			break;
 		case 2:
 			objBugs.push_back(getObjectiveYellowBugsBR(bugs[i].node));
@@ -494,24 +504,34 @@ void weigths_cells() {
 		for (int c = 0; c < width; c++)
 			matrixWeight[r][c].weight = 0.0f;
 	for (unsigned int i = 0; i < bugs.size(); i++) {
+//		cerr << "8" << endl;
 		cerr << "bug " << i << " type " << bugs[i].type << " [ " << bugs[i].node << "] to obj" << objBugs[i].node;
 		vector<int> & path = bugsPaths[i].discendenza;
+//		cerr << "9" << endl;
 			string dirBug = getMoveGB(bugs[i].node, path[1]);
+//		cerr << "10" << endl;
 			cerr << dirBug << endl;
 		for (unsigned int node = 0; node < path.size(); node++) {
+//			cerr << "11" << endl;
 				Point p(nodeToPair(path[node]));
 				if (node == 0) {
+//				cerr << "12" << endl;
 				cerr << "path to " << objBugs[i].node << ": ";
 				for (unsigned int a = 0; a < path.size(); a++)
+					{
+//					cerr << "13" << endl;
 					cerr << path[a] << ",";
+				}
 				cerr << endl;
 				matrixWeight[p.y][p.x].weight = 1.5f;
+//				cerr << "14" << endl;
 				} else {
+//				cerr << "15" << endl;
 					cerr << "node" << node << "=" << (1.0f - ((node - 1.0f) / 10.0)) << endl;
 					float weight = 1.0f - ((node - 1.0f) / 10.0);
 					if (weight < 0.0) weight = 0.0f;
 					if (matrixWeight[p.y][p.x].weight < weight) matrixWeight[p.y][p.x].weight = weight;
-
+//				cerr << "16" << endl;
 				}
 			}
 	}
@@ -818,7 +838,7 @@ bool sureToGo(const int& toGo) {
 	if (bugs.empty()) return true;
 	float weightToGo = getWeight(toGo);
 	float weightDM = getWeight(darkMind.node);
-	if (weightToGo <= 0.70 || (weightDM >= weightToGo && weightDM < 0.9)) return true;
+	if (weightToGo <= 0.80 || (weightDM >= weightToGo && weightDM <= 0.9)) return true;
 	return false;
 }
 map<ObjectWithRounds, vector<int> > checkDangerNode();
@@ -995,7 +1015,7 @@ int getObjectiveGreenBugsTR(const int & posBegin) {
 		}
 		if (yNew < 0) yNew = 0;
 		return pairToNode(p.y, yNew);
-	}
+	} else return darkMind.node;
 	return 0;
 }
 int getObjectiveYellowBugsBR(const int& posBegin) {
@@ -1073,7 +1093,7 @@ vector<int> getAdiacentsNode(const int& node, const bool & isforBug) {
 	if (node - width >= 0 && (matrixAdiacents[node][node - width] || (isforBug && node - width == objBugs[currentBug].node))) toReturn.push_back(node - width);
 	if (node + width < numNodes && (matrixAdiacents[node][node + width] || (isforBug && node + width == objBugs[currentBug].node))) toReturn.push_back(node + width);
 	if (node + 1 < numNodes && (matrixAdiacents[node][node + 1] || (isforBug && node + 1 == objBugs[currentBug].node))) toReturn.push_back(node + 1);
-	if (node - 1 >= 0 && (matrixAdiacents[node][node - 1] || (isforBug && node - 1 == objBugs[currentBug].node))) toReturn.push_back(node - 1);
+		if (node - 1 >= 0 && (matrixAdiacents[node][node - 1] || (isforBug && node - 1 == objBugs[currentBug].node))) toReturn.push_back(node - 1);
 	if (!isforBug) {
 	if (node == gates[0].node) toReturn.push_back(gates[1].node);
 		if (node == gates[1].node) toReturn.push_back(gates[0].node);
@@ -1094,6 +1114,29 @@ int numbersBonusNear(const int& node, const int& circle) {
 			}
 		}
 	return toReturn;
+}
+vector<int> pathForBug(const int & posBegin, const int & posEnd) {
+	bool found = false;
+	int currentNode = posBegin;
+	vector<int> path;
+	path.push_back(currentNode);
+	while (!found) {
+		cerr << "p1" << endl;
+		vector<int> adiacents(getAdiacentsNode(currentNode, true));
+		float min = INTMAX_MAX;
+		int tmpNext;
+		for (int i = 0; i < adiacents.size(); i++) {
+			float eDistance = euclidianDistanceNode(adiacents[i], posEnd);
+			if (eDistance < min) {
+				min = eDistance;
+				tmpNext = adiacents[i];
+			}
+		}
+		currentNode = tmpNext;
+		path.push_back(currentNode);
+		found = currentNode == posEnd;
+	}
+	return std::move(path);
 }
 NodeGB pathFindGB(const int & posBegin, const int & posEnd, bool isForBug) {
 	bool found = false;
@@ -1123,12 +1166,22 @@ NodeGB pathFindGB(const int & posBegin, const int & posEnd, bool isForBug) {
 				visited[ad[i]] = true;
 				vector<int> dis(s.discendenza);
 				dis.push_back(s.node);
-				float cost = euclidianDistanceNode(ad[i], posEnd) + s.cost;
+				float cost = euclidianDistanceNode(ad[i], posEnd) + (isForBug ? 0 : s.cost);
 				int w = getWeight(ad[i]);
 				if (!isForBug && w >= 0.75 && dis.size() < 5) cost *= (cost * w);
 				NodeGB temp(ad[i], cost, dis);
-				if (found && temp.cost < bestNode.cost) queue.push(temp);
-				else if (!found) queue.push(temp);
+				bool noMetto = false;
+				if (!isForBug) {
+				for (int bug = 0; bug < bugsPaths.size(); bug++) {
+					if (bugsPaths[bug].discendenza.size() > dis.size()) {
+						if (bugsPaths[bug].discendenza[dis.size()] == ad[i]) {
+							noMetto = true;
+						}
+					}
+					}
+				}
+				if (found && temp.cost < bestNode.cost && !noMetto) queue.push(temp);
+				else if (!found && !noMetto) queue.push(temp);
 			}
 		}
 	}

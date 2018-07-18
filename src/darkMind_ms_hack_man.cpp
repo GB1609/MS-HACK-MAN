@@ -28,7 +28,7 @@ int getFartherPlayer(const int & posBegin);
 int getObjectiveRedBugsTL(const int & posBegin);
 int getObjectiveGreenBugsTR(const int & posBegin);
 int getObjectiveYellowBugsBR(const int& posBegin);
-int getObjectiveBlueBugsBL(const int& posBegin);
+int getObjectiveVioletBugsBL(const int& posBegin);
 string getMoveGB(int begin, int move) {
 	if (begin - move == 1 || begin + (width - 1) == move) return "left";
 	else if (begin + 1 == move || begin - move == width - 1) return "right";
@@ -39,13 +39,14 @@ string getMoveGB(int begin, int move) {
 bool weightChange = true;
 unsigned int precBugNumber = 0;
 float precWeight = 0.0f;
-vector<int> pathFindGB(const int & posBegin, const int & posEnd);
 int numbersBonusNear(const int& node, const int& circle);
 class NodeGB {
 public:
 	int node;
 	vector<int> discendenza;
 	float cost;
+	NodeGB() { // @suppress("Class members should be properly initialized")
+	} //serve ad elena
 	NodeGB(int n, int c, vector<int> f) {
 		node = n;
 		cost = c;
@@ -61,19 +62,8 @@ public:
 			discendenza[b] = a.discendenza[b];
 		return *this;
 	}
-
-	float getCost() const {
-		return cost;
-	}
-
-	const vector<int>& getDiscendenza() const {
-		return discendenza;
-	}
-
-	int getNode() const {
-		return node;
-	}
 };
+NodeGB pathFindGB(const int & posBegin, const int & posEnd, bool isForBug);
 class Point {
 public:
 	int x = -1;
@@ -113,7 +103,7 @@ public:
 		return *this;
 	}
 };
-vector<int> getAdiacentsNode(const int& node);
+vector<int> getAdiacentsNode(const int& node, const bool & isForBug);
 ///////// let a node returns its coordinates
 Point nodeToPair(const int & node) {
 	int r = node / width;
@@ -144,12 +134,14 @@ public:
 	void setPosition(Point & p) {
 		x = p.x;
 		y = p.y;
+		direction = getMoveGB(node, p.node);
 		node = p.node;
 	}
 };
 class Cell;
 bool** matrixAdiacents;
 Cell** matrixWeight;
+bool ** matrixWall;
 bool inMatrix(int coordY, int coorX) {
 	return coordY >= 0 && coordY < height && coorX >= 0 && coorX < width;
 }
@@ -438,76 +430,100 @@ void addAdiacentsGates() {
 		for (unsigned int j = 0; j < gates.size(); j++)
 			matrixAdiacents[gates[i].node][gates[j].node] = 1;
 }
+bool inMatrixNode(const int& node) {
+	return (node >= 0 && node < numNodes);
+}
+float getWeight(const int& node) {
+	if (node < 0 || node >= numNodes) return INT_MAX;
+	return matrixWeight[nodeToPair(node).y][nodeToPair(node).x].weight;
+}
+bool thereIsBugNear(const int& node) {
+	int circle = 2;
+	int toReturn = 0;
+	for (int i = -circle; i < circle + 1; i++)
+		for (int c = -circle; c < circle + 1; c++) {
+			for (unsigned int a = 0; a < bugs.size(); a++) {
+				int cell = (node + (width * c)) + i;
+				if (cell == bugs[a].node) toReturn++;
+			}
+		}
+	return toReturn > 1;
+}
+vector<NodeGB> bugsPaths;
+vector<Point> objBugs;
+int currentBug = 0;
 void weigths_cells() {
-	for (int r = 0; r < height; r++) {
-		for (int c = 0; c < width; c++) {
+//	cerr << "1" << endl;
+	bugsPaths.clear();
+	objBugs.clear();
+	for (unsigned int i = 0; i < bugs.size(); i++) {
+		switch (bugs[i].type) {
+		case 0: //RED
+			objBugs.push_back(getObjectiveRedBugsTL(bugs[i].node));
+			currentBug = i;
+			bugsPaths.push_back(std::move(pathFindGB(bugs[i].node, objBugs[i].node, true)));
+			break;
+		case 1: //GREEN
+			objBugs.push_back(getObjectiveGreenBugsTR(bugs[i].node));
+			currentBug = i;
+			bugsPaths.push_back(std::move(pathFindGB(bugs[i].node, objBugs[i].node, true)));
+			break;
+		case 2://YELLOW
+			objBugs.push_back(getObjectiveYellowBugsBR(bugs[i].node));
+			currentBug = i;
+			bugsPaths.push_back(std::move(pathFindGB(bugs[i].node, objBugs[i].node, true)));
+			break;
+		case 3://VIOLET
+			objBugs.push_back(getObjectiveVioletBugsBL(bugs[i].node));
+			currentBug = i;
+			bugsPaths.push_back(std::move(pathFindGB(bugs[i].node, objBugs[i].node, true)));
+			break;
+		default:
+			break;
+		}
+	}
+	for (int r = 0; r < height; r++)
+		for (int c = 0; c < width; c++)
 			matrixWeight[r][c].weight = 0.0f;
-			for (unsigned int bug = 0; bug < bugs.size(); bug++) {
-				int bugCol = bugs[bug].x;
-				int bugRow = bugs[bug].y;
-
-				float cPeso = 0.0;
-				if (r < bugRow) {
-					float rPeso = 1.0 - ((bugRow - r - 1.0) / 10.0);
-					if (c <= bugCol) {
-						cPeso = rPeso - ((bugCol - c) / 10.0);
-					} else {
-						cPeso = rPeso - ((c - bugCol) / 10.0);
-
-					}
-				}
-				if (r == bugRow) {
-					if (c < bugCol) {
-						cPeso = 1.0 - ((bugCol - c - 1.0) / 10.0);
-					} else {
-						if (c == bugCol) {
-							if (matrixWeight[r][c].weight > 0.0) matrixWeight[r][c].weight = 1.5 + 0.1;
-							else matrixWeight[r][c].weight = 1.5;
-							continue;
-						} else {
-							cPeso = 1.0 - ((c - bugCol - 1.0) / 10.0);
-						}
-					}
-				}
-
-				if (r > bugRow) {
-					float rPeso = 1.0 - ((r - bugRow - 1.0) / 10.0);
-					if (c <= bugCol) {
-						cPeso = rPeso - ((bugCol - c) / 10.0);
-					} else {
-						cPeso = rPeso - ((c - bugCol) / 10.0);
-
-					}
-				}
-
-				//if (r > bugRow &&inMatrix(r-1,c)&& !matrixAdiacents[pairToNode(r - 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
-				//if (r < bugRow &&inMatrix(r+1,c)&& !matrixAdiacents[pairToNode(r + 1, c)][pairToNode(r, c)]) cPeso -= 0.1;
-				//if (c > bugRow &&inMatrix(r,c-1)&& !matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
-				//if (c > bugRow && inMatrix(r,c+1)&&!matrixAdiacents[pairToNode(r, c - 1)][pairToNode(r, c)]) cPeso -= 0.1;
-				if (cPeso < 0.6) cPeso = 0.0f;
-				if (matrixWeight[r][c].weight > cPeso) matrixWeight[r][c].weight += 0.1;
-				else if (matrixWeight[r][c].weight > 0.0) matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso + 0.1 : 0.0;
-				else matrixWeight[r][c].weight = cPeso > 0.0 ? cPeso : 0.0;
+	for (unsigned int i = 0; i < bugs.size(); i++) {
+		cerr << "bug " << i << " type " << bugs[i].type << " [ " << bugs[i].node << "] to obj" << objBugs[i].node;
+		vector<int> & path = bugsPaths[i].discendenza;
+		string dirBug = getMoveGB(bugs[i].node, path[1]);
+		cerr << dirBug << endl;
+		for (unsigned int node = 0; node < path.size(); node++) {
+			Point p(nodeToPair(path[node]));
+			if (node == 0) {
+				cerr << "path to " << objBugs[i].node << ": ";
+				for (unsigned int a = 0; a < path.size(); a++)
+					cerr << path[a] << ",";
+				cerr << endl;
+				matrixWeight[p.y][p.x].weight = 1.5f;
+			} else {
+				cerr << "node" << node << "=" << (1.0f - ((node - 1.0f) / 10.0)) << endl;
+				float weight = 1.0f - ((node - 1.0f) / 10.0);
+				if (weight < 0.0) weight = 0.0f;
+				if (matrixWeight[p.y][p.x].weight < weight) matrixWeight[p.y][p.x].weight = weight;
 			}
 		}
 	}
-//  if(bugs.size()!=0){
-//      for(int i=0;i<bugs.size();i++)
-//      cerr<<bugs[i].y<<"---"<<bugs[i].x<<endl;
-//  cerr<<"llllllllllllllllllllllllllllll"<<endl;
-//  for (int r = 0; r < height; r++)
-//  {
-//    for (int c = 0; c < width; c++)
-//      cerr << matrixWeight[r][c].weight << "-";
-//    cerr << endl;
-//    }}
+	if (bugs.size() != 0) {
+		cerr << turn << endl;
+		for (unsigned int i = 0; i < bugs.size(); i++)
+			cerr << bugs[i].y << "---" << bugs[i].x << endl;
+		cerr << "---------------------------" << endl;
+		for (int r = 0; r < height; r++) {
+			for (int c = 0; c < width; c++)
+				cerr << matrixWeight[r][c].weight << "-";
+			cerr << endl;
+		}
+	}
 }
 bool inAdiacentDiAdiacent(int node) {
-	vector<int> ad = getAdiacentsNode(node);
+	vector<int> ad = getAdiacentsNode(node, false);
 	for (unsigned int i = 0; i < ad.size(); i++) {
 		for (unsigned int bug = 0; bug < bugs.size(); bug++) {
 			if (bugs[bug].node == ad[i]) {
-				vector<int> ad2 = getAdiacentsNode(bugs[bug].node);
+				vector<int> ad2 = getAdiacentsNode(bugs[bug].node, false);
 				ad2.push_back(ad[i]);
 				for (unsigned int j = 0; j < ad2.size(); j++) {
 					for (unsigned int bug2 = 0; bug2 < bugs.size(); bug2++) {
@@ -557,8 +573,11 @@ void process_next_command() {
 				matrixAdiacents[r] = new bool[numNodes] { 0 };
 			}
 			matrixWeight = new Cell*[height];
-			for (int i = 0; i < height; i++)
+			matrixWall = new bool*[height];
+			for (int i = 0; i < height; i++) {
 				matrixWeight[i] = new Cell[width];
+				matrixWall[i] = new bool[width] { 0 };
+			}
 			initAdiacents();
 		}
 
@@ -582,8 +601,11 @@ void process_next_command() {
 			std::vector<std::string> fields((std::istream_iterator<StringDelimitedBy<','>>(iss)), std::istream_iterator<StringDelimitedBy<','>>());
 
 			for (unsigned int ce = 0; ce < fields.size(); ce++) {
-				if (fields[ce][0] == 'x' && !isSetWalls) removeAdiacents(ce);
-				else if (fields[ce][0] == 'x') continue;
+				if (fields[ce][0] == 'x' && !isSetWalls) {
+					Point p = nodeToPair(ce);
+					matrixWall[p.y][p.x] = true;
+					removeAdiacents(ce);
+				} else if (fields[ce][0] == 'x') continue;
 				parseObjects(fields[ce], ce);
 			}
 			if (!isSetWalls) addAdiacentsGates();
@@ -637,13 +659,95 @@ int main() {
 	delete[] matrixAdiacents;
 	for (int i = 0; i < height; i++) {
 		delete[] matrixWeight[i];
+		delete[] matrixWall[i];
 	}
 	delete[] matrixWeight;
+	delete[] matrixWall;
 	return 0;
 }
 string getSafeDir() {
-
-	vector<int> nodes = getAdiacentsNode(darkMind.node);
+	int dm = darkMind.node;
+	int l1 = darkMind.node - 1, l2 = darkMind.node - 2, r1 = darkMind.node + 1, r2 = darkMind.node + 2;
+	int u1 = darkMind.node - width, u2 = darkMind.node - width * 2, d1 = darkMind.node + width, d2 = darkMind.node + width * 2;
+	int gate = (euclidianDistanceNode(dm, gates[0].node) < euclidianDistanceNode(dm, gates[1].node)) ? gates[0].node : gates[1].node;
+	if (((inMatrixNode(u1) && getWeight(u1) >= 1.5) || (inMatrixNode(u2) && getWeight(u2) >= 1.5))   //ATTACK U ,D and R
+	&& ((inMatrixNode(d1) && getWeight(d1) >= 1.5) || (inMatrixNode(d2) && getWeight(d2) >= 1.5))
+			&& ((inMatrixNode(r1) && getWeight(r1) >= 1.5) || (inMatrixNode(r2) && getWeight(r2) >= 1.5))) {
+		if (inMatrixNode(l1) && matrixAdiacents[dm][l1]) return "left";
+	} else if (((inMatrixNode(u1) && getWeight(u1) >= 1.5) || (inMatrixNode(u2) && getWeight(u2) >= 1.5))   //ATTACK U ,D and L
+	&& ((inMatrixNode(d1) && getWeight(d1) >= 1.5) || (inMatrixNode(d2) && getWeight(d2) >= 1.5))
+			&& ((inMatrixNode(l1) && getWeight(l1) >= 1.5) || (inMatrixNode(l2) && getWeight(l2) >= 1.5))) {
+		if (inMatrixNode(r1) && matrixAdiacents[dm][r1]) return "right";
+	} else if (((inMatrixNode(l1) && getWeight(l1) >= 1.5) || (inMatrixNode(l2) && getWeight(l2) >= 1.5)) //ATTACK R,L and D
+	&& ((inMatrixNode(r1) && getWeight(r1) >= 1.5) || (inMatrixNode(r1) && getWeight(r2) >= 1.5))
+			&& ((inMatrixNode(d1) && getWeight(d1) >= 1.5) || (inMatrixNode(d2) && getWeight(d2) >= 1.5))) {
+		if (inMatrixNode(u1) && matrixAdiacents[dm][u1]) return "up";
+	} else if (((inMatrixNode(l1) && getWeight(l1) >= 1.5) || (inMatrixNode(l2) && getWeight(l2) >= 1.5)) //ATTACK R,L and U
+	&& ((inMatrixNode(r1) && getWeight(r1) >= 1.5) || (inMatrixNode(r1) && getWeight(r2) >= 1.5))
+			&& ((inMatrixNode(u1) && getWeight(u1) >= 1.5) || (inMatrixNode(u2) && getWeight(u2) >= 1.5))) {
+		if (inMatrixNode(d1) && matrixAdiacents[dm][d1]) return "down";
+	} else if (((inMatrixNode(l1) && getWeight(l1) >= 1.5) || (inMatrixNode(l2) && getWeight(l2) >= 1.5))  //ATTACK R AND L
+	&& ((inMatrixNode(r1) && getWeight(r1) >= 1.5) || (inMatrixNode(r1) && getWeight(r2) >= 1.5))) {
+		if (inMatrixNode(u1) && inMatrixNode(d2) && matrixAdiacents[dm][u1] && matrixAdiacents[dm][d1]) {
+			if (getWeight(d1) == getWeight(u1)) {
+				if (euclidianDistanceNode(d1, gate) <= euclidianDistanceNode(u1, gate)) return "down";
+				else return "up";
+			} else if (getWeight(d1) > getWeight(u1)) return "up";
+			else return "down";
+		} else if (inMatrixNode(u1) && matrixAdiacents[dm][u1] && (!inMatrixNode(d1) || !matrixAdiacents[dm][d1])) return "up";
+		else if ((!inMatrixNode(u1) || !matrixAdiacents[dm][u1]) && inMatrixNode(d1) && matrixAdiacents[dm][d1]) return "down";
+	} else if (((inMatrixNode(u1) && getWeight(u1) >= 1.5) || (inMatrixNode(u2) && getWeight(u2) >= 1.5))   //ATTACK U AND D
+	&& ((inMatrixNode(d1) && getWeight(d1) >= 1.5) || (inMatrixNode(d2) && getWeight(d2) >= 1.5))) {
+		if (inMatrixNode(l1) && inMatrixNode(r1) && matrixAdiacents[dm][l1] && matrixAdiacents[dm][r1]) {
+			if (getWeight(l1) == getWeight(r1)) {
+				if (euclidianDistanceNode(l1, gate) <= euclidianDistanceNode(r1, gate)) return "left";
+				else return "right";
+			} else if (getWeight(l1) < getWeight(r1)) return "left";
+			else return "right";
+		} else if (inMatrixNode(l1) && matrixAdiacents[dm][l1] && (!matrixAdiacents[dm][r1] || !inMatrixNode(r1))) return "left";
+		else if ((!inMatrixNode(l1) || !matrixAdiacents[dm][l1]) && inMatrixNode(r1) && matrixAdiacents[dm][r1]) return "right";
+	} else if (((inMatrixNode(u1) && getWeight(u1) >= 1.5) || (inMatrixNode(u2) && getWeight(u2) >= 1.5))   //ATTACK U AND L
+	&& ((inMatrixNode(l1) && getWeight(l1) >= 1.5) || (inMatrixNode(l2) && getWeight(l2) >= 1.5))) {
+		if (inMatrixNode(d1) && inMatrixNode(r1) && matrixAdiacents[dm][d1] && matrixAdiacents[dm][r1]) {
+			if (getWeight(d1) == getWeight(r1)) {
+				if (euclidianDistanceNode(d1, gate) < euclidianDistanceNode(r1, gate)) return "down";
+				else return "right";
+			} else if (getWeight(d1) < getWeight(r1)) return "down";
+			else return "right";
+		} else if (inMatrixNode(d1) && matrixAdiacents[dm][d1] && (!matrixAdiacents[dm][r1] || !inMatrixNode(r1))) return "down";
+		else if ((!inMatrixNode(d1) || !matrixAdiacents[dm][d1]) && inMatrixNode(r1) && matrixAdiacents[dm][r1]) return "right";
+	} else if (((inMatrixNode(u1) && getWeight(u1) >= 1.5) || (inMatrixNode(u2) && getWeight(u2) >= 1.5))   //ATTACK U AND R
+	&& ((inMatrixNode(r1) && getWeight(r1) >= 1.5) || (inMatrixNode(r2) && getWeight(r2) >= 1.5))) {
+		if (inMatrixNode(d1) && inMatrixNode(l1) && matrixAdiacents[dm][d1] && matrixAdiacents[dm][l1]) {
+			if (getWeight(d1) == getWeight(l1)) {
+				if (euclidianDistanceNode(d1, gate) < euclidianDistanceNode(l1, gate)) return "down";
+				else return "left";
+			} else if (getWeight(d1) < getWeight(l1)) return "down";
+			else return "left";
+		} else if (inMatrixNode(d1) && matrixAdiacents[dm][d1] && (!matrixAdiacents[dm][l1] || !inMatrixNode(l1))) return "down";
+		else if ((!inMatrixNode(d1) || !matrixAdiacents[dm][d1]) && inMatrixNode(l1) && matrixAdiacents[dm][l1]) return "left";
+	} else if (((inMatrixNode(d1) && getWeight(d1) >= 1.5) || (inMatrixNode(d2) && getWeight(d2) >= 1.5))   //ATTACK D AND L
+	&& ((inMatrixNode(l1) && getWeight(l1) >= 1.5) || (inMatrixNode(l2) && getWeight(l2) >= 1.5))) {
+		if (inMatrixNode(u1) && inMatrixNode(r1) && matrixAdiacents[dm][u1] && matrixAdiacents[dm][r1]) {
+			if (getWeight(r1) == getWeight(u1)) {
+				if (euclidianDistanceNode(r1, gate) <= euclidianDistanceNode(u1, gate)) return "right";
+				else return "up";
+			} else if (getWeight(u1) < getWeight(r1)) return "up";
+			else return "right";
+		} else if (inMatrixNode(u1) && matrixAdiacents[dm][u1] && (!matrixAdiacents[dm][r1] || !inMatrixNode(r1))) return "up";
+		else if ((!inMatrixNode(u1) || !matrixAdiacents[dm][u1]) && inMatrixNode(r1) && matrixAdiacents[dm][r1]) return "right";
+	} else if (((inMatrixNode(d1) && getWeight(d1) >= 1.5) || (inMatrixNode(d2) && getWeight(d2) >= 1.5))   //ATTACK D AND R
+	&& ((inMatrixNode(r1) && getWeight(r1) >= 1.5) || (inMatrixNode(r2) && getWeight(r2) >= 1.5))) {
+		if (inMatrixNode(u1) && inMatrixNode(l1) && matrixAdiacents[dm][u1] && matrixAdiacents[dm][l1]) {
+			if (getWeight(l1) == getWeight(u1)) {
+				if (euclidianDistanceNode(l1, gate) <= euclidianDistanceNode(u1, gate)) return "left";
+				else return "up";
+			} else if (getWeight(u1) < getWeight(l1)) return "up";
+			else return "left";
+		} else if (inMatrixNode(u1) && matrixAdiacents[dm][u1] && (!matrixAdiacents[dm][l1] || !inMatrixNode(l1))) return "up";
+		else if ((!inMatrixNode(u1) || !matrixAdiacents[dm][u1]) && inMatrixNode(l1) && matrixAdiacents[dm][l1]) return "left";
+	}
+	vector<int> nodes = getAdiacentsNode(darkMind.node, false);
 	vector<Cell> adiacents;
 	for (unsigned int i = 0; i < nodes.size(); i++)
 		adiacents.push_back(matrixWeight[nodeToPair(nodes[i]).y][nodeToPair(nodes[i]).x]);
@@ -658,9 +762,7 @@ string getSafeDir() {
 			if (e1 < e0 && e1 < min) toR = 1;
 		}
 	}
-	Cell & cSafe = adiacents[toR];
-//	cerr << cSafe.x << "--" << cSafe.y << endl;
-	return getMoveGB(darkMind.node, cSafe.node);
+	return getMoveGB(darkMind.node, adiacents[toR].node);
 }
 Point dirToCell(string s) {
 	if (s == "left") return std::move(Point(darkMind.x - 1, darkMind.y));
@@ -669,48 +771,11 @@ Point dirToCell(string s) {
 	if (s == "down") return std::move(Point(darkMind.x, darkMind.y + 1));
 	return std::move(Point(darkMind.x, darkMind.y));
 }
-bool isOnRight(const int &node1, const int& node2) {
-	return node1 == node2 - 1 || node1 == node2 - (width - 1);
-}
-bool isOnLeft(const int &node1, const int& node2) {
-	return node1 == node2 + 1 || node1 == node2 + (width - 1);
-}
-bool isOnUp(const int &node1, const int& node2) {
-	return node1 == node2 + width;
-}
-bool isOnDown(const int &node1, const int& node2) {
-	return node1 == node2 - width;
-}
-int weightToLeft(const int &node1) {
-	int x = nodeToPair(node1).x;
-	int y = nodeToPair(node1).y;
-	(x - 1 < 0) ? x = width - 1 : x - 1;
-	return matrixWeight[y][x].weight;
-}
-bool weightToRight(const int &node1, const int& node2) {
-	int x = nodeToPair(node1).x;
-	int y = nodeToPair(node1).y;
-	(x + 1 == width) ? x = 0 : x + 1;
-	return matrixWeight[y][x].weight;
-}
-int weightToUp(const int &node1) {
-	int x = nodeToPair(node1).x;
-	int y = nodeToPair(node1).y - 1;
-	return matrixWeight[y][x].weight;
-}
-int weightToDown(const int &node1) {
-	int x = nodeToPair(node1).x;
-	int y = nodeToPair(node1).y + 1;
-	return matrixWeight[y][x].weight;
-}
-float getWeight(const int& node) {
-	return matrixWeight[nodeToPair(node).y][nodeToPair(node).x].weight;
-}
-bool sureToGo(const int& toGo, const int& dm) {
-	float weightToGo = getWeight(toGo);
-	float weightDM = getWeight(dm);
+bool sureToGo(const int& toGo) {
 	if (bugs.empty()) return true;
-	if (weightToGo <= 0.70 || weightDM >= weightToGo) return true;
+	float weightToGo = getWeight(toGo);
+	float weightDM = getWeight(darkMind.node);
+	if (weightToGo <= 0.70 || (weightDM >= weightToGo && weightDM <= 0.9)) return true;
 	return false;
 }
 map<ObjectWithRounds, vector<int> > checkDangerNode();
@@ -719,52 +784,58 @@ vector<SimpleObject> toScan;
 void do_move() {
 	cerr << "start turn: " << turn << endl;
 	cerr << "my pos:" << darkMind.node << "     enemy pos:" << enemy.node << endl;
-	int toPrint = -1, toPrintEN = -1, toGO, aroundV;
-	unsigned int min = INT_MAX, minEN = INT_MAX, pathChoicher, sizeEN;
-	float eN, eDM;
+	int toPrint = -1, toGO, aroundV;
+	unsigned int min = INT_MAX, pathChoicher, sizeEN, sizeDM, minCost = INT_MAX;
 //	if ((inAdiacentDiAdiacent(darkMind.node)) ? getWeight(darkMind.node) >= 0.0 : getWeight(darkMind.node) >= 0.8) cout << getSafeDir() << endl;
-	if (getWeight(darkMind.node) >= 0.8) cout << getSafeDir() << endl;
-	else {
-		if (weightChange) {
-			toScan = vector<SimpleObject>(snippets);
-			for (unsigned int a = 0; a < weapons.size(); a++) {
-				if (weapons[a].rounds == -1) toScan.push_back(SimpleObject(weapons[a].node));
-			}
-			sort(toScan.begin(), toScan.end());
+//	if (getWeight(darkMind.node) >= 0.8) {
+//		cout << getSafeDir() << endl;
+//		cerr << "save my ass" << endl;
+//	} else {
+	if (weightChange) {
+		toScan = vector<SimpleObject>(snippets);
+		for (unsigned int a = 0; a < weapons.size(); a++) {
+			if (weapons[a].rounds == -1) toScan.push_back(SimpleObject(weapons[a].node));
 		}
-		for (unsigned int i = 0; i < toScan.size(); i++) {
-			vector<int> temp = pathFindGB(darkMind.node, toScan[i].node);
-			cerr << "path to " << toScan[i].node << ": ";
-			for (unsigned int a = 0; a < temp.size(); a++)
-				cerr << temp[a] << ",";
-			cerr << "with length " << temp.size();
-			vector<int> tempEn = pathFindGB(enemy.node, toScan[i].node);
-			if (tempEn.size() < minEN || minEN == INT_MAX) {
-				minEN = tempEn.size();
-				toPrintEN = temp[tempEn.size() - 1];
-			}
-			toGO = temp[temp.size() - 1];
-			aroundV = numbersBonusNear(toGO, around) - 1;
-			pathChoicher = temp.size() - aroundV;
-			cerr << " updated to " << temp.size() << endl;
-			sizeEN = tempEn.size();
-			eN = euclidianDistanceNode(toPrintEN, toScan[i].node);
-			eDM = euclidianDistanceNode(toGO, toScan[i].node);
-			if (temp.size() > 0 && (sizeEN >= temp.size() || eN > eDM) && pathChoicher < min) {
+		sort(toScan.begin(), toScan.end());
+	}
+	for (unsigned int i = 0; i < toScan.size(); i++) {
+		NodeGB temp = pathFindGB(darkMind.node, toScan[i].node, false);
+		sizeDM = temp.discendenza.size();
+		cerr << "path to " << toScan[i].node << ": ";
+		for (unsigned int a = 0; a < sizeDM; a++)
+			cerr << temp.discendenza[a] << ",";
+		cerr << "with length " << sizeDM;
+		NodeGB tempEn = pathFindGB(enemy.node, toScan[i].node, false);
+		toGO = temp.discendenza[1];
+		aroundV = numbersBonusNear(toScan[i].node, around) - 1;
+		pathChoicher = sizeDM - aroundV;
+		cerr << " updated to " << pathChoicher << endl;
+		sizeEN = tempEn.discendenza.size();
+		if (temp.node != numNodes && (sizeEN >= sizeDM) && pathChoicher <= min) {
+			if (pathChoicher == min && temp.cost < minCost) {
 				toPrint = toGO;
+				minCost = temp.cost;
 				min = pathChoicher;
+			} else if (pathChoicher < min) {
+				min = pathChoicher;
+				toPrint = toGO;
+				minCost = temp.cost;
 			}
-		}
-		cerr << "CHOICHE: ";
-		if (toPrint == -1) {
-			vector<int> toCe = pathFindGB(darkMind.node, centerNode);
-			(toCe.size() > 0) ? cout << getMoveGB(darkMind.node, toCe[toCe.size() - 1]) << endl : cout << getSafeDir() << endl;
-			cerr << "GO TO CENTER or PASS" << endl;
-		} else {
-			cout << getMoveGB(darkMind.node, toPrint) << endl;
-			cerr << "GO TO " << toPrint << endl;
 		}
 	}
+	cerr << "CHOICHE: ";
+	if (toPrint == -1) {
+		NodeGB toCe = pathFindGB(darkMind.node, centerNode, false);
+		(toCe.node != numNodes && sureToGo(toCe.discendenza[1])) ? cout << getMoveGB(darkMind.node, toCe.discendenza[1]) << endl : cout << getSafeDir() << endl;
+		cerr << "GO TO CENTER or SAVE" << endl;
+	} else if (!sureToGo(toPrint)) {
+		cout << getSafeDir() << endl;
+		cerr << "save my ass " << endl;
+	} else {
+		cout << getMoveGB(darkMind.node, toPrint) << endl;
+		cerr << "GO TO " << toPrint << endl;
+	}
+//	}
 	cerr << "END TURN: " << turn << endl;
 	turn++;
 }
@@ -824,26 +895,61 @@ int getObjectiveRedBugsTL(const int & posBegin) {
 	if (closestPlayer == darkMind.id) return darkMind.node;
 	else return enemy.node;
 }
+int getAdiacentsWithMinimuED(const int& posBegin, const int & posEnd) {
+	Point p(posEnd);
+	float eDistance = euclidianDistanceNode(posBegin, posEnd);
+	int toReturn = 0;
+	float minDifference = INTMAX_MAX;
+	for (int i = 0; i < 4; i++) {
+		if (inMatrix(p.y + dy[i], p.x + dx[i]) && !matrixWall[p.y + dy[i]][p.x + dx[i]]) {
+			float minDiff;
+			if ((minDiff = abs((eDistance - euclidianDistanceNode(posBegin, pairToNode(p.y + dy[i], p.x + dx[i]))))) < minDifference) {
+				minDifference = minDiff;
+				toReturn = i;
+			}
+		}
+	}
+	return pairToNode(p.y + dy[toReturn], p.x + dx[toReturn]);
+
+}
 int getObjectiveGreenBugsTR(const int & posBegin) {
 	int closestPlayer = getClosestPlayer(posBegin);
 	Player p = (closestPlayer == darkMind.id) ? darkMind : enemy;
+	Point b(posBegin);
 	if (p.direction == "up") {
+
 		int xNew = p.y - 4;
 		if (xNew < 0) xNew = 0;
+		if (b.x == p.x && b.y + 1 == p.y - 1) {
+			xNew = b.y + 1;
+		}
+		if (xNew > height - 1) xNew = height - 1;
 		return pairToNode(xNew, p.x);
 	} else if (p.direction == "down") {
 		int xNew = p.y + 4;
 		if (xNew > height - 1) xNew = height - 1;
+		if (b.x == p.x && b.y - 1 == p.y + 1) {
+			xNew = b.y - 1;
+		}
+		if (xNew < 0) xNew = 0;
 		return pairToNode(xNew, p.x);
 	} else if (p.direction == "left") {
 		int yNew = p.x - 4;
 		if (yNew < 0) yNew = 0;
+		if (b.y == p.y && b.x + 1 == p.x - 1) {
+			yNew = b.x + 1;
+		}
+		if (yNew > width) yNew = width - 1;
 		return pairToNode(p.y, yNew);
 	} else if (p.direction == "right") {
 		int yNew = p.x + 4;
 		if (yNew > width - 1) yNew = width - 1;
+		if (b.y == p.y && b.x - 1 == p.x + 1) {
+			yNew = b.x - 1;
+		}
+		if (yNew < 0) yNew = 0;
 		return pairToNode(p.y, yNew);
-	}
+	} else return darkMind.node;
 	return 0;
 }
 int getObjectiveYellowBugsBR(const int& posBegin) {
@@ -872,7 +978,7 @@ int getObjectiveYellowBugsBR(const int& posBegin) {
 
 	return pairToNode(y, x);
 }
-int getObjectiveBlueBugsBL(const int& posBegin) {
+int getObjectiveVioletBugsBL(const int& posBegin) {
 	int fartherPlayer = getFartherPlayer(posBegin);
 	if (fartherPlayer == darkMind.id) return darkMind.node;
 	else return enemy.node;
@@ -916,14 +1022,16 @@ vector<int> getDangerNodes(ObjectWithRounds bomb) {
 	}
 	return nodes;
 }
-vector<int> getAdiacentsNode(const int& node) {
+vector<int> getAdiacentsNode(const int& node, const bool & isforBug) {
 	vector<int> toReturn;
-	if (node - width >= 0 && matrixAdiacents[node][node - width]) toReturn.push_back(node - width);
-	if (node + width < numNodes && matrixAdiacents[node][node + width]) toReturn.push_back(node + width);
-	if (node + 1 < numNodes && matrixAdiacents[node][node + 1]) toReturn.push_back(node + 1);
-	if (node - 1 >= 0 && matrixAdiacents[node][node - 1]) toReturn.push_back(node - 1);
-	if (node == gates[0].node) toReturn.push_back(gates[1].node);
-	if (node == gates[1].node) toReturn.push_back(gates[0].node);
+	if (node - width >= 0 && (matrixAdiacents[node][node - width] || (isforBug && node - width == objBugs[currentBug].node))) toReturn.push_back(node - width);
+	if (node + width < numNodes && (matrixAdiacents[node][node + width] || (isforBug && node + width == objBugs[currentBug].node))) toReturn.push_back(node + width);
+	if (node + 1 < numNodes && (matrixAdiacents[node][node + 1] || (isforBug && node + 1 == objBugs[currentBug].node))) toReturn.push_back(node + 1);
+	if (node - 1 >= 0 && (matrixAdiacents[node][node - 1] || (isforBug && node - 1 == objBugs[currentBug].node))) toReturn.push_back(node - 1);
+	if (!isforBug) {
+		if (node == gates[0].node) toReturn.push_back(gates[1].node);
+		if (node == gates[1].node) toReturn.push_back(gates[0].node);
+	}
 	return toReturn;
 }
 int numbersBonusNear(const int& node, const int& circle) {
@@ -941,11 +1049,10 @@ int numbersBonusNear(const int& node, const int& circle) {
 		}
 	return toReturn;
 }
-vector<int> pathFindGB(const int & posBegin, const int & posEnd) {
+NodeGB pathFindGB(const int & posBegin, const int & posEnd, bool isForBug) {
 	bool found = false;
 	vector<int> disc;
 	NodeGB bestNode(numNodes, 0, disc);
-// Mark all the vertices as not visited
 	bool visited[numNodes];
 	for (int i = 0; i < numNodes; i++)
 		visited[i] = false;
@@ -964,29 +1071,32 @@ vector<int> pathFindGB(const int & posBegin, const int & posEnd) {
 			}
 		}
 		queue.pop();
-		vector<int> ad = getAdiacentsNode(s.node);
+		vector<int> ad = getAdiacentsNode(s.node, isForBug);
 		for (unsigned int i = 0; i < ad.size(); i++) {
 			if (!visited[ad[i]]) {
 				visited[ad[i]] = true;
 				vector<int> dis(s.discendenza);
 				dis.push_back(s.node);
-				float cost = euclidianDistanceNode(ad[i], posEnd) + s.cost;
+				float cost = euclidianDistanceNode(ad[i], posEnd) + (isForBug ? 0 : s.cost);
 				int w = getWeight(ad[i]);
-				if (w >= 0.75 && dis.size() < 5) cost *= (cost * w);
+				if (!isForBug && w >= 0.75 && dis.size() < 5) cost *= (cost * w);
 				NodeGB temp(ad[i], cost, dis);
-				if (found && temp.cost < bestNode.cost) queue.push(temp);
-				else if (!found) queue.push(temp);
+				bool pushNode = false;
+				if (!isForBug) {
+					for (unsigned int bug = 0; bug < bugsPaths.size(); bug++) {
+						if (bugsPaths[bug].discendenza.size() > dis.size()) {
+							if (bugsPaths[bug].discendenza[dis.size()] == ad[i]) {
+								pushNode = true;
+							}
+						}
+					}
+				}
+				if (found && temp.cost < bestNode.cost && !pushNode) queue.push(temp);
+				else if (!found && !pushNode) queue.push(temp);
 			}
 		}
 	}
-	vector<int> toReturn;
-	if (bestNode.node == numNodes) return toReturn;
-	else {
-		toReturn.push_back(posEnd);
-		for (int i = bestNode.discendenza.size() - 1; i > 0; i--)
-			toReturn.push_back(bestNode.discendenza[i]);
-		return toReturn;
-	}
-	return toReturn;
+	bestNode.discendenza.push_back(posEnd);
+	return bestNode;
 }
 

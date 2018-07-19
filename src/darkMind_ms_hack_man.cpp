@@ -238,9 +238,30 @@ public:
 			Point(node), type(type) {
 	}
 	Bug(int node) :
-			Point(node), type(-1) {
+			Point(node) {
+		switch (node) {
+		case 0:
+			type = 0;
 
+			break;
+		case width - 1:
+			type = 1;
+
+			break;
+		case width * height:
+			type = 2;
+
+			break;
+		case 0:
+			type = pairToNode(height, 0);
+
+			break;
+		default:
+			type = -1;
+			break;
+		}
 	}
+
 };
 template<char delimiter>
 class StringDelimitedBy: public string {
@@ -391,7 +412,7 @@ void parseObjects(const string & objList, const int &cell) {
 					break;
 				case 'S': {
 					spawn_points.push_back(ObjectWithRounds(cell, stoi(objs[i].erase(0, 1))));
-//					if (spawn_points.back() == 1) bugs.push_back(spawn_points.back().node);
+					if (spawn_points.back().rounds == 1) bugs.push_back(spawn_points.back().node);
 				}
 					break;
 				case 'G':

@@ -1304,6 +1304,11 @@ int iNeedToProgramABomb()
 
     int bomb=FALSE;
     bomb = canPutABomb(nextDarkMindNode);
+   int bombEnemy=canPutABomb(enemy.node);
+
+    if((nextDarkMindX == enemy.x || nextDarkMindY == enemy.y)&&!existWall(nextDarkMindY,nextDarkMindX,enemy.y,enemy.x) &&
+            darkMind.snippets > 3 and enemy.snippets < 4 && bombEnemy > 2)
+        return 2;
 
     if((nextDarkMindX == enemy.x || nextDarkMindY == enemy.y)&&!existWall(nextDarkMindY,nextDarkMindX,enemy.y,enemy.x)
             && canPutABomb(enemy.node) < bomb)

@@ -1077,6 +1077,19 @@ void do_move() {
 		cout << getMoveGB(darkMind.node, toPrint) << endl;
 		cerr << "GO TO " << toPrint << endl;
 	}
+	cerr << "CHOICHE: ";
+	if (toPrint == -1) {
+		NodeGB toCe = pathFindGB(darkMind.node, centerNode, false);
+		(toCe.node != numNodes && sureToGo(toCe.discendenza[1])) ? cout << getMoveGB(darkMind.node, toCe.discendenza[1]) << endl : cout << getSafeDir() << endl;
+		cerr << "GO TO CENTER or SAVE" << endl;
+	} else if (!sureToGo(toPrint)) {
+		cout << getSafeDir() << endl;
+		cerr << "save my ass " << endl;
+	} else {
+		cout << getMoveGB(darkMind.node, toPrint) << endl;
+		cerr << "GO TO " << toPrint << endl;
+	}
+//	}
 	cerr << "END TURN: " << turn << endl;
 	turn++;
 }
@@ -1136,6 +1149,23 @@ int getObjectiveRedBugsTL(const int & posBegin) {
 	int closestPlayer = getClosestPlayer(posBegin);
 	if (closestPlayer == darkMind.id) return darkMind.node;
 	else return enemy.node;
+}
+int getAdiacentsWithMinimuED(const int& posBegin, const int & posEnd) {
+	Point p(posEnd);
+	float eDistance = euclidianDistanceNode(posBegin, posEnd);
+	int toReturn = 0;
+	float minDifference = INTMAX_MAX;
+	for (int i = 0; i < 4; i++) {
+		if (inMatrix(p.y + dy[i], p.x + dx[i]) && !matrixWall[p.y + dy[i]][p.x + dx[i]]) {
+			float minDiff;
+			if ((minDiff = abs((eDistance - euclidianDistanceNode(posBegin, pairToNode(p.y + dy[i], p.x + dx[i]))))) < minDifference) {
+				minDifference = minDiff;
+				toReturn = i;
+			}
+		}
+	}
+	return pairToNode(p.y + dy[toReturn], p.x + dx[toReturn]);
+
 }
 int getObjectiveGreenBugsTR(const int & posBegin) {
 	int closestPlayer = getClosestPlayer(posBegin);
